@@ -42,6 +42,11 @@ workflows:
       - name: Set up code signing
         script: |
           set -ex
+          echo "=== Checking credentials ==="
+          echo "KEY_ID: $APP_STORE_CONNECT_KEY_IDENTIFIER"
+          echo "ISSUER: $APP_STORE_CONNECT_ISSUER_ID"
+          echo "KEY length: ${#APP_STORE_CONNECT_PRIVATE_KEY}"
+          echo "CERT length: ${#CERTIFICATE_PRIVATE_KEY}"
           keychain initialize
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
