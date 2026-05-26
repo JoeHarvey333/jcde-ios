@@ -1,0 +1,99 @@
+workflows:
+  ios-release:
+    name: JCDE iOS Release
+    max_build_duration: 60
+    environment:
+      xcode: latest
+      groups:
+        - apple_credentials
+      vars:
+        BUNDLE_ID: com.signara.jcde
+        XCODE_SCHEME: JCDE
+        APP_NAME: "Joe's CC Dev"
+    scripts:
+      - name: Install XcodeGen
+        script: |
+          set -ex
+          brew install xcodegen
+
+      - name: Set build version
+        script: |
+          set -ex
+          BUILD_VER=$((BUILD_NUMBER + 100))
+          MARKETING_VER="1.${BUILD_VER}.0"
+          sed -i.bak "s|CURRENT_PROJECT_VERSION: \"[^\"]*\"|CURRENT_PROJECT_VERSION: \"${BUILD_VER}\"|" project.yml
+          sed -i.bak "s|MARKETING_VERSION: \"[^\"]*\"|MARKETING_VERSION: \"${MARKETING_VER}\"|" project.yml
+
+      - name: Create app in App Store Connect if needed
+        script: |
+          set -ex
+          app-store-connect create-app \
+            --bundle-id "$BUNDLE_ID" \
+            --name "$APP_NAME" \
+            --primary-locale en-US \
+            --sku JCDE001 \
+            || echo "App may already exist, continuing..."
+
+      - name: Generate Xcode project
+        script: |
+          set -ex
+          xcodegen generate
+
+      - name: Set up code signing
+        script: |
+          set -ex
+          keychain initialize
+          app-store-connect fetch-signing-files \
+            "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+
+      - name: Build and archive
+        script: |
+          set -ex
+          xcodebuild archive \
+            -project JCDE.xcodeproj \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath build/JCDE.xcarchive \
+            DEVELOPMENT_TEAM=AJ3GSWSC4K
+
+      - name: Export IPA
+        script: |
+          set -ex
+          cat > /tmp/ExportOptions.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>AJ3GSWSC4K</string>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath build/JCDE.xcarchive \
+            -exportOptionsPlist /tmp/ExportOptions.plist \
+            -exportPath build/ipa
+
+    artifacts:
+      - build/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
+      email:
+        recipients:
+          - joeharvey333@gmail.com
