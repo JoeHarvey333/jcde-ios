@@ -21,16 +21,13 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         set { UserDefaults.standard.set(Float(newValue), forKey: "termFontSize") }
     }
 
-    override var inputAccessoryView: UIView? {
-        get { nil }
-        set { }
-    }
-
     override init(frame: CGRect) {
         super.init(frame: frame)
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
         font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        inputAssistantItem.leadingBarButtonGroups = []
+        inputAssistantItem.trailingBarButtonGroups = []
 
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         addGestureRecognizer(pinch)
