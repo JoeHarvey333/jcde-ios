@@ -77,6 +77,8 @@ workflows:
               <string>app-store-connect</string>
               <key>teamID</key>
               <string>AJ3GSWSC4K</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
               <key>uploadSymbols</key>
               <true/>
               <key>compileBitcode</key>
