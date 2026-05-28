@@ -29,12 +29,13 @@ workflows:
       - name: Create app in App Store Connect if needed
         script: |
           set -ex
-          app-store-connect create-app \
-            --bundle-id "$BUNDLE_ID" \
+          export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
+          app-store-connect apps create \
+            --bundle-id-identifier "$BUNDLE_ID" \
             --name "$APP_NAME" \
-            --primary-locale en-US \
+            --primary-locale EN_US \
             --sku JCDE001 \
-            || echo "App may already exist, continuing..."
+            2>&1 || echo "App may already exist, continuing..."
 
       - name: Generate Xcode project
         script: |
