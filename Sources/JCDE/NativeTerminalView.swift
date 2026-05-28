@@ -16,6 +16,10 @@ struct NativeTerminalView: UIViewRepresentable {
 class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
+    private var fontSize: CGFloat {
+        get { CGFloat(UserDefaults.standard.float(forKey: "termFontSize").nonZero ?? 16) }
+        set { UserDefaults.standard.set(Float(newValue), forKey: "termFontSize") }
+    }
 
     override var inputAccessoryView: UIView? { nil }
 
@@ -23,10 +27,20 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         super.init(frame: frame)
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
-        font = UIFont.monospacedSystemFont(ofSize: 13, weight: .regular)
+        font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+
+        let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        addGestureRecognizer(pinch)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func handlePinch(_ g: UIPinchGestureRecognizer) {
+        guard g.state == .ended else { return }
+        let newSize = (fontSize * g.scale).clamped(to: 10...32)
+        fontSize = newSize
+        font = UIFont.monospacedSystemFont(ofSize: newSize, weight: .regular)
+    }
 
     func connect(projectKey: String) {
         let urlString = "ws://\(ProjectsStore.baseHost)/projects/\(projectKey)/terminal"
@@ -81,5 +95,15 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     deinit {
         wsTask?.cancel()
+    }
+}
+
+private extension Float {
+    var nonZero: Float? { self == 0 ? nil : self }
+}
+
+private extension CGFloat {
+    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
