@@ -68,8 +68,12 @@ workflows:
         script: |
           set -ex
           IPA=$(find build/ios/ipa -name "*.ipa" | head -1)
-          echo "=== IPA contents ==="
-          unzip -l "$IPA" | grep -i "icon\|\.png" | head -20
+          echo "=== Assets.car present? ==="
+          unzip -l "$IPA" | grep -i "assets.car" || echo "NO Assets.car found"
+          echo "=== All IPA contents ==="
+          unzip -l "$IPA" | grep -i "icon\|\.png\|assets" | head -30
+          echo "=== Assets.car icon entries ==="
+          unzip -p "$IPA" "*.app/Assets.car" > /tmp/Assets.car 2>/dev/null && assetutil --info /tmp/Assets.car | grep -i "name\|icon\|size" | head -30 || echo "Could not inspect Assets.car"
           echo "=== Info.plist CFBundleIcon ==="
           unzip -p "$IPA" "*.app/Info.plist" | plutil -p - | grep -i "icon" | head -20
           export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
