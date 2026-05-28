@@ -2,7 +2,8 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = ProjectsStore()
-    @State private var selected: Project?
+    @State private var openProjects: [Project] = []
+    @State private var activeProject: Project?
 
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -12,7 +13,7 @@ struct ContentView: View {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(store.projects) { project in
                         ProjectCard(project: project)
-                            .onTapGesture { selected = project }
+                            .onTapGesture { open(project) }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -21,11 +22,21 @@ struct ContentView: View {
             .navigationTitle("JCDE")
             .navigationBarTitleDisplayMode(.large)
             .background(Color(hex: "0E0E12"))
-            .fullScreenCover(item: $selected) { project in
-                ProjectTerminalView(project: project)
+            .fullScreenCover(isPresented: Binding(
+                get: { activeProject != nil },
+                set: { if !$0 { openProjects = []; activeProject = nil } }
+            )) {
+                TabTerminalView(openProjects: $openProjects, activeProject: $activeProject)
             }
         }
         .task { await store.load() }
+    }
+
+    private func open(_ project: Project) {
+        if !openProjects.contains(where: { $0.key == project.key }) {
+            openProjects.append(project)
+        }
+        activeProject = project
     }
 }
 

@@ -3,6 +3,7 @@ import SwiftTerm
 
 struct NativeTerminalView: UIViewRepresentable {
     let project: Project
+    var isActive: Bool = true
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
         let view = JCDETerminalHostView(frame: .zero)
@@ -10,10 +11,13 @@ struct NativeTerminalView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-    class Coordinator {}
+    func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {
+        if isActive {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                uiView.becomeFirstResponder()
+            }
+        }
+    }
 }
 
 class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
