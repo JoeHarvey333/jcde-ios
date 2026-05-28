@@ -54,28 +54,25 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
 
-      - name: Build and archive
+      - name: Build IPA
         script: |
           set -ex
           xcodebuild -downloadComponent MetalToolchain || true
-          xcodebuild archive \
-            -project JCDE.xcodeproj \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -archivePath build/JCDE.xcarchive \
-            DEVELOPMENT_TEAM=AJ3GSWSC4K
+          xcode-project build-ipa \
+            --project JCDE.xcodeproj \
+            --scheme "$XCODE_SCHEME" \
+            --archive-flags "-configuration Release DEVELOPMENT_TEAM=AJ3GSWSC4K"
 
-      - name: Export and Upload to TestFlight
+      - name: Upload to TestFlight
         script: |
           set -ex
           export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
-          export CERTIFICATE_PRIVATE_KEY=$(echo "$CERT_KEY_B64" | base64 -d)
           app-store-connect publish \
-            --path build/JCDE.xcarchive \
+            --path $(find build/ios/ipa -name "*.ipa" | head -1) \
             --testflight
 
     artifacts:
-      - build/JCDE.xcarchive
+      - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
