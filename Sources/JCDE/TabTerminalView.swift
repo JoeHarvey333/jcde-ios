@@ -35,6 +35,16 @@ struct TabTerminalView: View {
                     }
                 }
 
+                // Open URL for active project
+                if let urlString = activeProject?.url, let url = URL(string: urlString) {
+                    Link(destination: url) {
+                        Text("Open ↗")
+                            .font(.system(size: 12))
+                            .foregroundColor(Color(hex: "7B7BFF"))
+                            .padding(.horizontal, 8)
+                    }
+                }
+
                 // + button to add a tab
                 Button {
                     showProjectPicker = true
