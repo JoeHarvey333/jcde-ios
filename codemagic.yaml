@@ -65,50 +65,17 @@ workflows:
             -archivePath build/JCDE.xcarchive \
             DEVELOPMENT_TEAM=AJ3GSWSC4K
 
-      - name: Export IPA
-        script: |
-          set -ex
-          PROFILE=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
-          PROFILE_NAME=$(security cms -D -i "$PROFILE" | plutil -extract Name raw -)
-          echo "Using profile: $PROFILE_NAME"
-          cat > /tmp/ExportOptions.plist << PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store-connect</string>
-              <key>teamID</key>
-              <string>AJ3GSWSC4K</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.jcde</key>
-                  <string>${PROFILE_NAME}</string>
-              </dict>
-              <key>uploadSymbols</key>
-              <true/>
-              <key>compileBitcode</key>
-              <false/>
-          </dict>
-          </plist>
-          PLIST
-          xcodebuild -exportArchive \
-            -archivePath build/JCDE.xcarchive \
-            -exportOptionsPlist /tmp/ExportOptions.plist \
-            -exportPath build/ipa
-
-      - name: Upload to TestFlight
+      - name: Export and Upload to TestFlight
         script: |
           set -ex
           export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
+          export CERTIFICATE_PRIVATE_KEY=$(echo "$CERT_KEY_B64" | base64 -d)
           app-store-connect publish \
-            --path $(find build/ipa -name "*.ipa" | head -1) \
+            --path build/JCDE.xcarchive \
             --testflight
 
     artifacts:
-      - build/ipa/*.ipa
+      - build/JCDE.xcarchive
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
