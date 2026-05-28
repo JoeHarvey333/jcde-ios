@@ -7,7 +7,7 @@ struct ProjectTerminalView: View {
     var body: some View {
         NavigationStack {
             NativeTerminalView(project: project)
-                .ignoresSafeArea(edges: .bottom)
+                .ignoresSafeArea(.container, edges: .bottom)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {

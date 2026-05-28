@@ -17,6 +17,8 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
 
+    override var inputAccessoryView: UIView? { nil }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         terminalDelegate = self
