@@ -4,20 +4,24 @@ struct TabTerminalView: View {
     @Binding var openProjects: [Project]
     @Binding var activeProject: Project?
     @Environment(\.dismiss) private var dismiss
+    @State private var showProjectPicker = false
+    @StateObject private var store = ProjectsStore()
 
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
             HStack(spacing: 0) {
+                // Grid icon — back to project list (keeps tabs alive)
                 Button {
                     dismiss()
                 } label: {
                     Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 16))
+                        .font(.system(size: 15))
                         .foregroundColor(Color(hex: "7B7BFF"))
                         .frame(width: 44, height: 44)
                 }
 
+                // Tabs
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(openProjects) { project in
@@ -29,6 +33,16 @@ struct TabTerminalView: View {
                             )
                         }
                     }
+                }
+
+                // + button to add a tab
+                Button {
+                    showProjectPicker = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 15))
+                        .foregroundColor(Color(hex: "7B7BFF"))
+                        .frame(width: 44, height: 44)
                 }
             }
             .frame(height: 44)
@@ -50,6 +64,16 @@ struct TabTerminalView: View {
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showProjectPicker) {
+            ProjectPickerSheet(projects: store.projects, openKeys: Set(openProjects.map { $0.key })) { project in
+                if !openProjects.contains(where: { $0.key == project.key }) {
+                    openProjects.append(project)
+                }
+                activeProject = project
+                showProjectPicker = false
+            }
+        }
+        .task { await store.load() }
     }
 
     private func closeTab(_ project: Project) {
@@ -60,6 +84,49 @@ struct TabTerminalView: View {
         if openProjects.isEmpty {
             dismiss()
         }
+    }
+}
+
+struct ProjectPickerSheet: View {
+    let projects: [Project]
+    let openKeys: Set<String>
+    let onSelect: (Project) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List(projects) { project in
+                Button {
+                    onSelect(project)
+                } label: {
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color(hex: project.color))
+                            .frame(width: 10, height: 10)
+                        Text(project.name)
+                            .foregroundColor(.white)
+                        Spacer()
+                        if openKeys.contains(project.key) {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(Color(hex: "7B7BFF"))
+                                .font(.system(size: 12))
+                        }
+                    }
+                }
+                .listRowBackground(Color(hex: "22222A"))
+            }
+            .scrollContentBackground(.hidden)
+            .background(Color(hex: "0E0E12"))
+            .navigationTitle("Open Project")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                        .foregroundColor(Color(hex: "7B7BFF"))
+                }
+            }
+        }
+        .preferredColorScheme(.dark)
     }
 }
 

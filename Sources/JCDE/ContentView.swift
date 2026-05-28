@@ -24,7 +24,7 @@ struct ContentView: View {
             .background(Color(hex: "0E0E12"))
             .fullScreenCover(isPresented: Binding(
                 get: { activeProject != nil },
-                set: { if !$0 { openProjects = []; activeProject = nil } }
+                set: { if !$0 { activeProject = nil } }
             )) {
                 TabTerminalView(openProjects: $openProjects, activeProject: $activeProject)
             }
