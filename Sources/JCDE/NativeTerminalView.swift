@@ -5,7 +5,7 @@ struct NativeTerminalView: UIViewRepresentable {
     let project: Project
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
-        let view = JCDETerminalHostView()
+        let view = JCDETerminalHostView(frame: .zero)
         view.connect(projectKey: project.key)
         return view
     }
@@ -13,7 +13,7 @@ struct NativeTerminalView: UIViewRepresentable {
     func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {}
 }
 
-class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
+class JCDETerminalHostView: SwiftTerm.TerminalView, SwiftTerm.TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
 
@@ -57,24 +57,24 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     // MARK: - TerminalViewDelegate
 
-    func send(source: TerminalView, data: ArraySlice<UInt8>) {
+    func send(source: SwiftTerm.TerminalView, data: ArraySlice<UInt8>) {
         wsTask?.send(.data(Data(data))) { _ in }
     }
 
-    func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {
+    func sizeChanged(source: SwiftTerm.TerminalView, newCols: Int, newRows: Int) {
         guard let json = try? JSONSerialization.data(withJSONObject: ["type": "resize", "cols": newCols, "rows": newRows]) else { return }
         var frame = Data([0x00])
         frame.append(json)
         wsTask?.send(.data(frame)) { _ in }
     }
 
-    func scrolled(source: TerminalView, position: Double) {}
-    func setTerminalTitle(source: TerminalView, title: String) {}
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
-    func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {}
-    func bell(source: TerminalView) {}
-    func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
-    func clip(source: TerminalView, content: Data) {}
+    func scrolled(source: SwiftTerm.TerminalView, position: Double) {}
+    func setTerminalTitle(source: SwiftTerm.TerminalView, title: String) {}
+    func hostCurrentDirectoryUpdate(source: SwiftTerm.TerminalView, directory: String?) {}
+    func requestOpenLink(source: SwiftTerm.TerminalView, link: String, params: [String: String]) {}
+    func bell(source: SwiftTerm.TerminalView) {}
+    func rangeChanged(source: SwiftTerm.TerminalView, startY: Int, endY: Int) {}
+    func clip(source: SwiftTerm.TerminalView, content: Data) {}
 
     deinit {
         wsTask?.cancel()
