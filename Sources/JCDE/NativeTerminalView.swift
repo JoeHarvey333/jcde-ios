@@ -46,11 +46,21 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.becomeFirstResponder()
             }
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(claimFocus),
+                name: UIApplication.didBecomeActiveNotification,
+                object: nil
+            )
+        } else {
+            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
         }
     }
 
     @objc func claimFocus() {
-        if !isFirstResponder { becomeFirstResponder() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.becomeFirstResponder()
+        }
     }
 
     required init?(coder: NSCoder) { fatalError() }
