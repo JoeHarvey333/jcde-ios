@@ -22,7 +22,7 @@ struct ContentView: View {
             .navigationBarTitleDisplayMode(.large)
             .background(Color(hex: "0E0E12"))
             .fullScreenCover(item: $selected) { project in
-                TerminalView(project: project)
+                ProjectTerminalView(project: project)
             }
         }
         .task { await store.load() }

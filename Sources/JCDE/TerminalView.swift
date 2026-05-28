@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct TerminalView: View {
+struct ProjectTerminalView: View {
     let project: Project
     @Environment(\.dismiss) private var dismiss
 
