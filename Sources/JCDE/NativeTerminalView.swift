@@ -21,7 +21,10 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         set { UserDefaults.standard.set(Float(newValue), forKey: "termFontSize") }
     }
 
-    override var inputAccessoryView: UIView? { nil }
+    override var inputAccessoryView: UIView? {
+        get { nil }
+        set { }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
