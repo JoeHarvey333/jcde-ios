@@ -12,8 +12,9 @@ struct NativeTerminalView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {
+        uiView.isActiveTab = isActive
         if isActive {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 uiView.becomeFirstResponder()
             }
         }
@@ -23,6 +24,8 @@ struct NativeTerminalView: UIViewRepresentable {
 class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
+    var isActiveTab: Bool = true
+
     private var fontSize: CGFloat {
         get { CGFloat(UserDefaults.standard.float(forKey: "termFontSize").nonZero ?? 16) }
         set { UserDefaults.standard.set(Float(newValue), forKey: "termFontSize") }
@@ -44,15 +47,18 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         addGestureRecognizer(tap)
     }
 
+    required init?(coder: NSCoder) { fatalError() }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.becomeFirstResponder()
+                guard let self, self.isActiveTab else { return }
+                self.becomeFirstResponder()
             }
             NotificationCenter.default.addObserver(
                 self,
-                selector: #selector(claimFocus),
+                selector: #selector(appDidBecomeActive),
                 name: UIApplication.didBecomeActiveNotification,
                 object: nil
             )
@@ -61,19 +67,16 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         }
     }
 
-    @objc func claimFocus() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+    @objc private func appDidBecomeActive() {
+        guard isActiveTab else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
             self?.becomeFirstResponder()
         }
     }
 
-    required init?(coder: NSCoder) { fatalError() }
-
-    @objc private func handlePinch(_ g: UIPinchGestureRecognizer) {
-        guard g.state == .ended else { return }
-        let newSize = (fontSize * g.scale).clamped(to: 10...32)
-        fontSize = newSize
-        font = UIFont.monospacedSystemFont(ofSize: newSize, weight: .regular)
+    @objc func claimFocus() {
+        guard isActiveTab else { return }
+        if !isFirstResponder { becomeFirstResponder() }
     }
 
     func connect(projectKey: String) {
@@ -104,6 +107,13 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
                 break
             }
         }
+    }
+
+    @objc private func handlePinch(_ g: UIPinchGestureRecognizer) {
+        guard g.state == .ended else { return }
+        let newSize = (fontSize * g.scale).clamped(to: 10...32)
+        fontSize = newSize
+        font = UIFont.monospacedSystemFont(ofSize: newSize, weight: .regular)
     }
 
     // MARK: - TerminalViewDelegate
