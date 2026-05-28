@@ -78,8 +78,7 @@ workflows:
           unzip -p "$IPA" "*.app/Info.plist" | plutil -p - | grep -i "icon" | head -20
           export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
           app-store-connect publish \
-            --path $(find build/ios/ipa -name "*.ipa" | head -1) \
-            --testflight
+            --path $(find build/ios/ipa -name "*.ipa" | head -1)
 
     artifacts:
       - build/ios/ipa/*.ipa
