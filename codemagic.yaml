@@ -10,6 +10,7 @@ workflows:
         BUNDLE_ID: com.jcde
         XCODE_SCHEME: JCDE
         APP_NAME: "Joe's CC Dev"
+        PRIVATE_KEY_B64: "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR1RBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJIa3dkd0lCQVFRZ3VJQmkyR3dKVVhHVEhwNjAKU1UxOXZVYXUrT3c0Zm00U25TNUplNzRVU1NPZ0NnWUlLb1pJemowREFRZWhSQU5DQUFUYkNPRWp5ZlMzWGRndAprUDZlSlgyVDNITVMxb3ZJY21aYXlid3VCaExXUmxvb043aUlpbWsyUjAvZnB2SFlEVlhkQXlPWkVmSW55RDg0Cmc5UGZkRXByCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0="
     scripts:
       - name: Install XcodeGen
         script: |
@@ -42,11 +43,7 @@ workflows:
       - name: Set up code signing
         script: |
           set -ex
-          echo "=== Checking credentials ==="
-          echo "KEY_ID: $APP_STORE_CONNECT_KEY_IDENTIFIER"
-          echo "ISSUER: $APP_STORE_CONNECT_ISSUER_ID"
-          echo "KEY length: ${#APP_STORE_CONNECT_PRIVATE_KEY}"
-          echo "CERT length: ${#CERTIFICATE_PRIVATE_KEY}"
+          export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
           keychain initialize
           app-store-connect fetch-signing-files \
             "$BUNDLE_ID" \
@@ -89,16 +86,19 @@ workflows:
             -exportOptionsPlist /tmp/ExportOptions.plist \
             -exportPath build/ipa
 
+      - name: Upload to TestFlight
+        script: |
+          set -ex
+          export APP_STORE_CONNECT_PRIVATE_KEY=$(echo "$PRIVATE_KEY_B64" | base64 -d)
+          app-store-connect publish \
+            --path $(find build/ipa -name "*.ipa" | head -1) \
+            --testflight
+
     artifacts:
       - build/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
     publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: true
       email:
         recipients:
           - joeharvey333@gmail.com
