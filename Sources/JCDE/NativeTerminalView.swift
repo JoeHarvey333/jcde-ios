@@ -11,6 +11,9 @@ struct NativeTerminalView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    class Coordinator {}
 }
 
 class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
@@ -31,6 +34,23 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         addGestureRecognizer(pinch)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(claimFocus))
+        tap.cancelsTouchesInView = false
+        addGestureRecognizer(tap)
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.becomeFirstResponder()
+            }
+        }
+    }
+
+    @objc func claimFocus() {
+        if !isFirstResponder { becomeFirstResponder() }
     }
 
     required init?(coder: NSCoder) { fatalError() }
