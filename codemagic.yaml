@@ -7,7 +7,7 @@ workflows:
       groups:
         - apple_credentials
       vars:
-        BUNDLE_ID: com.signara.jcde
+        BUNDLE_ID: com.jcde
         XCODE_SCHEME: JCDE
         APP_NAME: "Joe's CC Dev"
     scripts:

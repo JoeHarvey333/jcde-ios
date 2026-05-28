@@ -1,5 +1,4 @@
 import SwiftUI
-import WebKit
 
 struct TerminalView: View {
     let project: Project
@@ -7,7 +6,7 @@ struct TerminalView: View {
 
     var body: some View {
         NavigationStack {
-            TerminalWebView(project: project)
+            NativeTerminalView(project: project)
                 .ignoresSafeArea(edges: .bottom)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -48,25 +47,3 @@ struct TerminalView: View {
     }
 }
 
-struct TerminalWebView: UIViewRepresentable {
-    let project: Project
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
-
-        let wv = WKWebView(frame: .zero, configuration: config)
-        wv.backgroundColor = UIColor(Color(hex: "0E0E12"))
-        wv.scrollView.backgroundColor = UIColor(Color(hex: "0E0E12"))
-        wv.isOpaque = false
-        wv.scrollView.bounces = false
-
-        let urlString = "\(ProjectsStore.baseURL)/terminal-page/\(project.key)"
-        if let url = URL(string: urlString) {
-            wv.load(URLRequest(url: url))
-        }
-        return wv
-    }
-
-    func updateUIView(_ uiView: WKWebView, context: Context) {}
-}
