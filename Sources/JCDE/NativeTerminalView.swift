@@ -75,7 +75,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     func requestOpenLink(source: TerminalView, link: String, params: [String: String]) {}
     func bell(source: TerminalView) {}
     func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
-    func clip(source: TerminalView, content: Data) {}
+    func clipboardCopy(source: TerminalView, content: Data) {}
 
     deinit {
         wsTask?.cancel()
