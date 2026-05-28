@@ -27,11 +27,8 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Sources/JCDE
-        excludes:
-          - Icons/**
     resources:
       - path: Assets.xcassets
-      - path: Sources/JCDE/Icons
     dependencies:
       - package: SwiftTerm
         product: SwiftTerm
