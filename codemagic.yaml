@@ -57,6 +57,7 @@ workflows:
       - name: Build and archive
         script: |
           set -ex
+          xcodebuild -downloadComponent MetalToolchain || true
           xcodebuild archive \
             -project JCDE.xcodeproj \
             -scheme "$XCODE_SCHEME" \
