@@ -69,8 +69,11 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     @objc private func appDidBecomeActive() {
         guard isActiveTab else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
-            self?.becomeFirstResponder()
+        for delay in [0.1, 0.3, 0.6, 1.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.isActiveTab, !self.isFirstResponder else { return }
+                self.becomeFirstResponder()
+            }
         }
     }
 
