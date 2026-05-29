@@ -148,7 +148,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func focusKeyboard() {
+    @objc func focusKeyboard() {
         keyProxy.becomeFirstResponder()
         keyProxy.reloadInputViews()
     }
@@ -184,10 +184,6 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
             guard let self, self.isActiveTab else { return }
             self.focusKeyboard()
         }
-    }
-
-    @objc private func focusKeyboard(_ sender: Any? = nil) {
-        focusKeyboard()
     }
 
     func connect(projectKey: String) {
