@@ -8,7 +8,6 @@ struct TabTerminalView: View {
     @State private var focusTrigger = 0
     @State private var newSessionTrigger = 0
     @State private var showNewSessionConfirm = false
-    @State private var keyboardHeight: CGFloat = 0
     @StateObject private var store = ProjectsStore()
 
     var body: some View {
@@ -97,9 +96,7 @@ struct TabTerminalView: View {
                     )
                 }
             }
-            .padding(.bottom, keyboardHeight)
             .ignoresSafeArea(.container, edges: .bottom)
-            .animation(.easeOut(duration: 0.25), value: keyboardHeight)
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
@@ -113,14 +110,6 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { n in
-            if let frame = n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                keyboardHeight = frame.height
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-            keyboardHeight = 0
-        }
         .confirmationDialog(
             "Start a new Claude session for \(activeProject?.name ?? "this project")?",
             isPresented: $showNewSessionConfirm,

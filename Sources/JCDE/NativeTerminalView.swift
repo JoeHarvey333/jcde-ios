@@ -182,15 +182,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
                 guard let self, self.isActiveTab else { return }
                 self.focusKeyboard()
             }
-            NotificationCenter.default.addObserver(self, selector: #selector(onAppForeground),
-                name: UIApplication.didBecomeActiveNotification, object: nil)
-        } else {
-            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
         }
-    }
-
-    @objc private func onAppForeground() {
-        // Reserved for future use on app resume
     }
 
     func connect(projectKey: String) {
