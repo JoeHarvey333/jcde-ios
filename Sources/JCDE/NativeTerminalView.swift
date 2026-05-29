@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftTerm
+import UIKit
 
 struct NativeTerminalView: UIViewRepresentable {
     let project: Project
@@ -16,18 +17,109 @@ struct NativeTerminalView: UIViewRepresentable {
         uiView.isHidden = !isActive
         uiView.isActiveTab = isActive
         if isActive {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                uiView.becomeFirstResponder()
-                uiView.reloadInputViews()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                uiView.focusKeyboard()
             }
         }
     }
 }
 
+// MARK: - Control Key Bar
+
+class TerminalControlBar: UIView {
+    var onKey: ((Data) -> Void)?
+
+    private let keys: [(String, Data)] = [
+        ("◀", Data([0x1b, 0x5b, 0x44])),
+        ("▶", Data([0x1b, 0x5b, 0x43])),
+        ("▲", Data([0x1b, 0x5b, 0x41])),
+        ("▼", Data([0x1b, 0x5b, 0x42])),
+        ("Esc", Data([0x1b])),
+        ("Tab", Data([0x09])),
+        ("^C",  Data([0x03])),
+        ("^A",  Data([0x01])),
+        ("^E",  Data([0x05])),
+        ("^B",  Data([0x02])),
+        ("^D",  Data([0x04])),
+        ("^L",  Data([0x0c])),
+    ]
+
+    override init(frame: CGRect) {
+        super.init(frame: CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 44))
+        backgroundColor = UIColor(red: 0.086, green: 0.086, blue: 0.11, alpha: 1)
+
+        let scroll = UIScrollView(frame: bounds)
+        scroll.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        scroll.showsHorizontalScrollIndicator = false
+        addSubview(scroll)
+
+        var x: CGFloat = 8
+        for (label, data) in keys {
+            let btn = UIButton(type: .system)
+            btn.setTitle(label, for: .normal)
+            btn.titleLabel?.font = UIFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+            btn.setTitleColor(UIColor(red: 0.7, green: 0.7, blue: 1.0, alpha: 1), for: .normal)
+            btn.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.2, alpha: 1)
+            btn.layer.cornerRadius = 6
+            let w = max(44, (btn.intrinsicContentSize.width + 20))
+            btn.frame = CGRect(x: x, y: 6, width: w, height: 32)
+            let capture = data
+            btn.addAction(UIAction { [weak self] _ in self?.onKey?(capture) }, for: .touchUpInside)
+            scroll.addSubview(btn)
+            x += w + 8
+        }
+        scroll.contentSize = CGSize(width: x, height: 44)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+// MARK: - Keyboard Proxy
+
+class KeyboardProxy: UITextField, UITextFieldDelegate {
+    var onBytes: ((Data) -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: CGRect(x: -10, y: -10, width: 1, height: 1))
+        delegate = self
+        autocorrectionType = .no
+        autocapitalizationType = .none
+        spellCheckingType = .no
+        smartDashesType = .no
+        smartQuotesType = .no
+        smartInsertDeleteType = .no
+        keyboardType = .asciiCapable
+        returnKeyType = .default
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var canBecomeFirstResponder: Bool { true }
+
+    func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        if string.isEmpty {
+            onBytes?(Data([0x7f])) // backspace
+        } else {
+            onBytes?(string.data(using: .utf8) ?? Data())
+        }
+        return false
+    }
+
+    func textFieldShouldReturn(_ tf: UITextField) -> Bool {
+        onBytes?(Data([0x0d]))
+        return false
+    }
+}
+
+// MARK: - Terminal Host View
+
 class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
     var isActiveTab: Bool = true
+
+    private let keyProxy = KeyboardProxy()
+    private let controlBar = TerminalControlBar()
 
     private var fontSize: CGFloat {
         get { CGFloat(UserDefaults.standard.float(forKey: "termFontSize").nonZero ?? 16) }
@@ -39,49 +131,63 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
         font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        inputAssistantItem.leadingBarButtonGroups = []
-        inputAssistantItem.trailingBarButtonGroups = []
+
+        // Proxy keyboard setup
+        controlBar.onKey = { [weak self] data in self?.sendBytes(data) }
+        keyProxy.onBytes = { [weak self] data in self?.sendBytes(data) }
+        keyProxy.inputAccessoryView = controlBar
+        addSubview(keyProxy)
 
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
         addGestureRecognizer(pinch)
 
-        let tap = UITapGestureRecognizer(target: self, action: #selector(claimFocus))
+        let tap = UITapGestureRecognizer(target: self, action: #selector(focusKeyboard))
         tap.cancelsTouchesInView = false
         addGestureRecognizer(tap)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
+    func focusKeyboard() {
+        keyProxy.becomeFirstResponder()
+        keyProxy.reloadInputViews()
+    }
+
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self, self.isActiveTab else { return }
-                self.becomeFirstResponder()
+                self.focusKeyboard()
             }
-            NotificationCenter.default.addObserver(
-                self,
-                selector: #selector(windowDidBecomeKey),
-                name: UIWindow.didBecomeKeyNotification,
-                object: nil
-            )
+            NotificationCenter.default.addObserver(self, selector: #selector(onWindowKey),
+                name: UIWindow.didBecomeKeyNotification, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(onAppForeground),
+                name: UIApplication.didBecomeActiveNotification, object: nil)
         } else {
             NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeKeyNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
         }
     }
 
-    @objc private func windowDidBecomeKey() {
+    @objc private func onWindowKey() {
         guard isActiveTab, window?.isKeyWindow == true else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self, self.isActiveTab else { return }
-            self.becomeFirstResponder()
-            self.reloadInputViews()
+            self.focusKeyboard()
         }
     }
 
-    @objc func claimFocus() {
+    @objc private func onAppForeground() {
         guard isActiveTab else { return }
-        if !isFirstResponder { becomeFirstResponder() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+            guard let self, self.isActiveTab else { return }
+            self.focusKeyboard()
+        }
+    }
+
+    @objc private func focusKeyboard(_ sender: Any? = nil) {
+        focusKeyboard()
     }
 
     func connect(projectKey: String) {
@@ -91,6 +197,10 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         wsTask = wsSession?.webSocketTask(with: url)
         wsTask?.resume()
         receive()
+    }
+
+    private func sendBytes(_ data: Data) {
+        wsTask?.send(.data(data)) { _ in }
     }
 
     private func receive() {
@@ -104,12 +214,10 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
                     DispatchQueue.main.async { self.feed(byteArray: bytes[...]) }
                 case .string(let text):
                     DispatchQueue.main.async { self.feed(text: text) }
-                @unknown default:
-                    break
+                @unknown default: break
                 }
                 self.receive()
-            case .failure:
-                break
+            case .failure: break
             }
         }
     }
@@ -124,6 +232,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     // MARK: - TerminalViewDelegate
 
     func send(source: TerminalView, data: ArraySlice<UInt8>) {
+        // SwiftTerm toolbar keys (arrows etc.) still come through here
         wsTask?.send(.data(Data(data))) { _ in }
     }
 
@@ -144,6 +253,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     deinit {
         wsTask?.cancel()
+        NotificationCenter.default.removeObserver(self)
     }
 }
 
