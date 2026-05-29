@@ -62,15 +62,9 @@ struct TabTerminalView: View {
                 .fill(Color(hex: "2A2A35"))
                 .frame(height: 1)
 
-            // Terminal views — all alive, only active visible
-            ZStack {
-                ForEach(openProjects) { project in
-                    NativeTerminalView(project: project, isActive: activeProject?.key == project.key)
-                        .opacity(activeProject?.key == project.key ? 1 : 0)
-                        .allowsHitTesting(activeProject?.key == project.key)
-                }
-            }
-            .ignoresSafeArea(.container, edges: .bottom)
+            // Terminal views — all alive in one UIKit container, only active visible
+            TerminalContainer(projects: openProjects, activeKey: activeProject?.key)
+                .ignoresSafeArea(.container, edges: .bottom)
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
