@@ -192,7 +192,10 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     @objc private func onAppForeground() {
         guard isActiveTab else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.scrollToBottom()
+            guard let self else { return }
+            // Scroll terminal to show latest output
+            let lastRow = self.terminal.rows - 1
+            self.scrollTo(row: lastRow)
         }
     }
 
