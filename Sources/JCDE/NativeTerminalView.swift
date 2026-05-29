@@ -103,6 +103,7 @@ class KeyboardProxy: UITextField, UITextFieldDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     override var canBecomeFirstResponder: Bool { true }
+    override var hasText: Bool { true } // ensures backspace is always delivered
 
     func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
         if string.isEmpty {
