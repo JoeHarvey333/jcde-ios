@@ -33,6 +33,7 @@ struct ContentView: View {
             }
 
             if activeProject != nil {
+                Color(hex: "0E0E12").ignoresSafeArea()
                 TabTerminalView(openProjects: $openProjects, activeProject: $activeProject)
                     .ignoresSafeArea()
             }
