@@ -75,20 +75,25 @@ struct TabTerminalView: View {
                     )
                 }
 
-                // Informational overlay — non-blocking, auto-dismisses when focus restored
+                // Tap-to-type overlay — only shown after returning from background
                 if showTapToType {
-                    VStack {
-                        Spacer()
-                        Text("Restoring keyboard…")
-                            .font(.system(size: 14))
-                            .foregroundColor(Color(hex: "7B7BFF").opacity(0.8))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(Color(hex: "22222A").opacity(0.9))
-                            .cornerRadius(10)
-                            .padding(.bottom, 40)
-                    }
-                    .allowsHitTesting(false)
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showTapToType = false
+                            focusAction?()
+                        }
+                        .overlay(
+                            Text("Tap to type")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "7B7BFF").opacity(0.8))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "22222A").opacity(0.9))
+                                .cornerRadius(10)
+                                .padding(.bottom, 40),
+                            alignment: .bottom
+                        )
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -112,9 +117,6 @@ struct TabTerminalView: View {
             if didBackground {
                 didBackground = false
                 showTapToType = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    showTapToType = false
-                }
             }
         }
         .confirmationDialog(
