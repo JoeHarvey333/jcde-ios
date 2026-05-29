@@ -4,6 +4,7 @@ import SwiftTerm
 struct NativeTerminalView: UIViewRepresentable {
     let project: Project
     var isActive: Bool = true
+    var focusTrigger: Int = 0
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
         let view = JCDETerminalHostView(frame: .zero)

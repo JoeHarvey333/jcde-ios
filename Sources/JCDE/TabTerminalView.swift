@@ -4,7 +4,9 @@ struct TabTerminalView: View {
     @Binding var openProjects: [Project]
     @Binding var activeProject: Project?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showProjectPicker = false
+    @State private var focusTrigger = 0
     @StateObject private var store = ProjectsStore()
 
     var body: some View {
@@ -65,7 +67,7 @@ struct TabTerminalView: View {
             // Terminal views — all alive, only active visible
             ZStack {
                 ForEach(openProjects) { project in
-                    NativeTerminalView(project: project, isActive: activeProject?.key == project.key)
+                    NativeTerminalView(project: project, isActive: activeProject?.key == project.key, focusTrigger: activeProject?.key == project.key ? focusTrigger : 0)
                         .opacity(activeProject?.key == project.key ? 1 : 0)
                         .allowsHitTesting(activeProject?.key == project.key)
                 }
@@ -84,6 +86,9 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active { focusTrigger += 1 }
+        }
     }
 
     private func closeTab(_ project: Project) {
