@@ -6,8 +6,6 @@ struct NativeTerminalView: UIViewRepresentable {
     let project: Project
     var isActive: Bool = true
     var newSessionTrigger: Int = 0
-    var focusTrigger: Int = 0
-    @Binding var sendBytesAction: ((Data) -> Void)?
     @Binding var focusAction: (() -> Void)?
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
@@ -23,13 +21,7 @@ struct NativeTerminalView: UIViewRepresentable {
         uiView.isActiveTab = isActive
 
         if isActive {
-            sendBytesAction = { data in uiView.sendBytesPublic(data) }
             focusAction = { uiView.focusKeyboard() }
-        }
-
-        if focusTrigger != coord.lastFocusTrigger {
-            coord.lastFocusTrigger = focusTrigger
-            if isActive { uiView.focusKeyboard() }
         }
 
         if newSessionTrigger != coord.lastNewSessionTrigger {
@@ -41,7 +33,6 @@ struct NativeTerminalView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
     class Coordinator {
         var lastNewSessionTrigger = 0
-        var lastFocusTrigger = 0
     }
 }
 
@@ -106,6 +97,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     var isActiveTab: Bool = true
     private var projectKey: String?
     private let keyProxy = KeyboardProxy()
+    private var lastSize: CGSize = .zero
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -113,7 +105,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
         font = UIFont.monospacedSystemFont(ofSize: 18, weight: .regular)
 
-        keyProxy.onBytes = { [weak self] data in self?.sendBytesInternal(data) }
+        keyProxy.onBytes = { [weak self] data in self?.sendBytes(data) }
         addSubview(keyProxy)
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(focusKeyboard))
@@ -130,17 +122,15 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        // Only send resize when bounds actually change
+        guard bounds.size != lastSize else { return }
+        lastSize = bounds.size
         let t = getTerminal()
         sizeChanged(source: self, newCols: t.cols, newRows: t.rows)
     }
 
     @objc func focusKeyboard() {
         keyProxy.becomeFirstResponder()
-    }
-
-    // Public so SwiftUI control bar can send bytes directly
-    func sendBytesPublic(_ data: Data) {
-        wsTask?.send(.data(data)) { _ in }
     }
 
     override func didMoveToWindow() {
@@ -176,7 +166,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         feed(text: "\r\n\u{1b}[2m[starting new session…]\u{1b}[0m\r\n")
     }
 
-    private func sendBytesInternal(_ data: Data) {
+    private func sendBytes(_ data: Data) {
         wsTask?.send(.data(data)) { _ in }
     }
 

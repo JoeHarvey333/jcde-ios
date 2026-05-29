@@ -7,31 +7,14 @@ struct TabTerminalView: View {
     @State private var showProjectPicker = false
     @State private var newSessionTrigger = 0
     @State private var showNewSessionConfirm = false
-    @State private var focusTrigger = 0
     @State private var showTapToType = false
     @State private var didBackground = false
-    @State private var sendBytesAction: ((Data) -> Void)? = nil
     @State private var focusAction: (() -> Void)? = nil
     @StateObject private var store = ProjectsStore()
 
-    let controlKeys: [(String, [UInt8])] = [
-        ("◀", [0x1b, 0x5b, 0x44]),
-        ("▶", [0x1b, 0x5b, 0x43]),
-        ("▲", [0x1b, 0x5b, 0x41]),
-        ("▼", [0x1b, 0x5b, 0x42]),
-        ("Esc", [0x1b]),
-        ("Tab", [0x09]),
-        ("^C", [0x03]),
-        ("^A", [0x01]),
-        ("^E", [0x05]),
-        ("^B", [0x02]),
-        ("^D", [0x04]),
-        ("^L", [0x0c]),
-    ]
-
     var body: some View {
         VStack(spacing: 0) {
-            // Tab bar — sits below status bar
+            // Tab bar
             HStack(spacing: 0) {
                 Button { dismiss() } label: {
                     Image(systemName: "square.grid.2x2")
@@ -81,20 +64,18 @@ struct TabTerminalView: View {
 
             Rectangle().fill(Color(hex: "2A2A35")).frame(height: 1)
 
-            // Terminal views
+            // Terminal views — all kept alive, only active is visible
             ZStack {
                 ForEach(openProjects) { project in
                     NativeTerminalView(
                         project: project,
                         isActive: activeProject?.key == project.key,
                         newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0,
-                        focusTrigger: activeProject?.key == project.key ? focusTrigger : 0,
-                        sendBytesAction: $sendBytesAction,
                         focusAction: $focusAction
                     )
                 }
 
-                // Tap-to-type overlay — only after returning from background
+                // Tap-to-type overlay — only shown after returning from background
                 if showTapToType {
                     Color.clear
                         .contentShape(Rectangle())
@@ -110,37 +91,12 @@ struct TabTerminalView: View {
                                 .padding(.vertical, 8)
                                 .background(Color(hex: "22222A").opacity(0.9))
                                 .cornerRadius(10)
-                                .padding(.bottom, 60),
+                                .padding(.bottom, 40),
                             alignment: .bottom
                         )
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
-
-            // Control bar — always visible, not attached to keyboard
-            VStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(controlKeys, id: \.0) { key in
-                            Button {
-                                sendBytesAction?(Data(key.1))
-                            } label: {
-                                Text(key.0)
-                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                    .foregroundColor(Color(hex: "B0B0FF"))
-                                    .frame(height: 32)
-                                    .padding(.horizontal, 10)
-                                    .background(Color(hex: "1E1E28"))
-                                    .cornerRadius(6)
-                                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: "33333D"), lineWidth: 1))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 8)
-                }
-                .frame(height: 44)
-            }
-            .background(Color(hex: "16161E"))
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
