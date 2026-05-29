@@ -37,6 +37,11 @@ struct ContentView: View {
             }
         }
         .task { await store.load() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first?.windows.first?.makeKeyAndVisible()
+        }
     }
 
     private func open(_ project: Project) {
