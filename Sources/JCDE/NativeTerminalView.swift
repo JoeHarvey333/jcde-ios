@@ -190,6 +190,18 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
                 guard let self, self.isActiveTab else { return }
                 self.focusKeyboard()
             }
+            NotificationCenter.default.addObserver(self, selector: #selector(onAppForeground),
+                name: UIApplication.didBecomeActiveNotification, object: nil)
+        } else {
+            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
+        }
+    }
+
+    @objc private func onAppForeground() {
+        guard isActiveTab else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self, self.isActiveTab else { return }
+            _ = self.keyProxy.becomeFirstResponder()
         }
     }
 
