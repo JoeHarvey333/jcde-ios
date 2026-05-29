@@ -179,6 +179,12 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         super.scrollRectToVisible(rect, animated: animated)
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let t = getTerminal()
+        sizeChanged(source: self, newCols: t.cols, newRows: t.rows)
+    }
+
     @objc func focusKeyboard() {
         keyProxy.becomeFirstResponder()
     }
