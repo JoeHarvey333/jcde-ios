@@ -5,7 +5,6 @@ struct TabTerminalView: View {
     @Binding var activeProject: Project?
     @Environment(\.dismiss) private var dismiss
     @State private var showProjectPicker = false
-    @State private var focusTrigger = 0
     @State private var newSessionTrigger = 0
     @State private var showNewSessionConfirm = false
     @StateObject private var store = ProjectsStore()
@@ -58,16 +57,6 @@ struct TabTerminalView: View {
                         .frame(width: 44, height: 44)
                 }
 
-                // Keyboard restore button
-                Button {
-                    focusTrigger += 1
-                } label: {
-                    Image(systemName: "keyboard")
-                        .font(.system(size: 15))
-                        .foregroundColor(Color(hex: "7B7BFF"))
-                        .frame(width: 44, height: 44)
-                }
-
                 // + button to add a tab
                 Button {
                     showProjectPicker = true
@@ -91,7 +80,6 @@ struct TabTerminalView: View {
                     NativeTerminalView(
                         project: project,
                         isActive: activeProject?.key == project.key,
-                        focusTrigger: activeProject?.key == project.key ? focusTrigger : 0,
                         newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0
                     )
                 }

@@ -21,6 +21,13 @@ struct ContentView: View {
             }
             .navigationTitle("JCDE")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .bottomBar) {
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                        .font(.system(size: 12))
+                        .foregroundColor(Color(hex: "555560"))
+                }
+            }
             .background(Color(hex: "0E0E12"))
             .fullScreenCover(isPresented: Binding(
                 get: { activeProject != nil },

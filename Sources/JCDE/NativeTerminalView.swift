@@ -5,7 +5,6 @@ import UIKit
 struct NativeTerminalView: UIViewRepresentable {
     let project: Project
     var isActive: Bool = true
-    var focusTrigger: Int = 0
     var newSessionTrigger: Int = 0
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
@@ -20,12 +19,6 @@ struct NativeTerminalView: UIViewRepresentable {
         uiView.isHidden = !isActive
         uiView.isActiveTab = isActive
 
-        // Focus: explicit tap on ⌨ button or tab switch
-        if focusTrigger != coord.lastFocusTrigger {
-            coord.lastFocusTrigger = focusTrigger
-            if isActive { uiView.focusKeyboard() }
-        }
-
         if newSessionTrigger != coord.lastNewSessionTrigger {
             coord.lastNewSessionTrigger = newSessionTrigger
             uiView.newSession()
@@ -34,7 +27,6 @@ struct NativeTerminalView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
     class Coordinator {
-        var lastFocusTrigger = 0
         var lastNewSessionTrigger = 0
     }
 }
