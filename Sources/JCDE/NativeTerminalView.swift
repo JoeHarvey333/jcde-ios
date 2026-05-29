@@ -2,70 +2,123 @@ import SwiftUI
 import SwiftTerm
 import UIKit
 
-// MARK: - SwiftTerm host view (one per project, owns its WebSocket)
+// MARK: - Keyboard Proxy
+// An invisible text field handles typing so the SwiftTerm view is NEVER the
+// first responder — which leaves its native UIScrollView scrolling fully intact.
+// (Making the terminal itself the responder is what broke scroll.)
 
-final class JCDETerminalHostView: TerminalView, TerminalViewDelegate, UIGestureRecognizerDelegate {
+final class KeyboardProxy: UITextField, UITextFieldDelegate {
+    var onBytes: ((Data) -> Void)?
+
+    override init(frame: CGRect) {
+        super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        alpha = 0.011
+        delegate = self
+        autocorrectionType = .no
+        autocapitalizationType = .none
+        spellCheckingType = .no
+        smartDashesType = .no
+        smartQuotesType = .no
+        smartInsertDeleteType = .no
+        keyboardType = .asciiCapable
+        returnKeyType = .default
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var canBecomeFirstResponder: Bool { true }
+    override var hasText: Bool { true }
+
+    func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        if string.isEmpty {
+            onBytes?(Data([0x7f]))
+        } else {
+            onBytes?(string.data(using: .utf8) ?? Data())
+        }
+        return false
+    }
+
+    func textFieldShouldReturn(_ tf: UITextField) -> Bool {
+        onBytes?(Data([0x0d]))
+        return false
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        for press in presses {
+            guard let key = press.key else { continue }
+            switch key.keyCode {
+            case .keyboardDeleteOrBackspace: onBytes?(Data([0x7f])); return
+            case .keyboardReturnOrEnter:     onBytes?(Data([0x0d])); return
+            case .keyboardTab:               onBytes?(Data([0x09])); return
+            case .keyboardEscape:            onBytes?(Data([0x1b])); return
+            default: break
+            }
+        }
+        super.pressesBegan(presses, with: event)
+    }
+}
+
+// MARK: - Terminal Host View (native scroll preserved)
+
+final class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
     var isActiveTab: Bool = true
-    private var panAccum: CGFloat = 0
+    private var projectKey: String?
+    private let keyProxy = KeyboardProxy()
+    private var lastSize: CGSize = .zero
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
         font = UIFont.monospacedSystemFont(ofSize: 17, weight: .regular)
-        inputAssistantItem.leadingBarButtonGroups = []
-        inputAssistantItem.trailingBarButtonGroups = []
 
-        let tap = UITapGestureRecognizer(target: self, action: #selector(focusSoon))
+        keyProxy.onBytes = { [weak self] data in self?.sendBytes(data) }
+        addSubview(keyProxy)
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(focusKeyboard))
         tap.cancelsTouchesInView = false
         addGestureRecognizer(tap)
-
-        // Custom pan → SwiftTerm's own scrollUp/scrollDown (bypasses the iPadOS
-        // gesture arena, which eats the built-in scroll view pan on 26.5).
-        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
-        pan.delegate = self
-        pan.cancelsTouchesInView = false
-        addGestureRecognizer(pan)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
-
-    @objc private func handlePan(_ g: UIPanGestureRecognizer) {
-        if g.state == .began { panAccum = 0 }
-        let t = g.translation(in: self)
-        g.setTranslation(.zero, in: self)
-        panAccum += t.y
-        let step: CGFloat = 22   // ~one text line of drag
-        let lines = Int(panAccum / step)
-        if lines != 0 {
-            if lines > 0 { scrollUp(lines: lines) } else { scrollDown(lines: -lines) }
-            panAccum -= CGFloat(lines) * step
-        }
+    // Stop iOS from yanking scroll to the keyProxy when it takes focus
+    override func scrollRectToVisible(_ rect: CGRect, animated: Bool) {
+        guard rect != keyProxy.frame else { return }
+        super.scrollRectToVisible(rect, animated: animated)
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard bounds.size != lastSize else { return }
+        lastSize = bounds.size
+        let t = getTerminal()
+        sizeChanged(source: self, newCols: t.cols, newRows: t.rows)
+    }
+
+    @objc func focusKeyboard() {
+        guard isActiveTab else { return }
+        keyProxy.becomeFirstResponder()
+    }
+
+    // Scroll buttons use SwiftTerm's own scrollback API (bonus alongside native scroll)
     func scrollLinesUp(_ n: Int) { scrollUp(lines: n) }
     func scrollLinesDown(_ n: Int) { scrollDown(lines: n) }
-
-    @objc func focusSoon() {
-        guard isActiveTab, !isFirstResponder else { return }
-        becomeFirstResponder()
-    }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self, self.isActiveTab else { return }
-                self.becomeFirstResponder()
+                self.focusKeyboard()
             }
         }
     }
 
     func connect(projectKey: String) {
+        self.projectKey = projectKey
         let urlString = "ws://\(ProjectsStore.baseHost)/projects/\(projectKey)/terminal"
         guard let url = URL(string: urlString) else { return }
         wsSession = URLSession(configuration: .default)
@@ -79,6 +132,10 @@ final class JCDETerminalHostView: TerminalView, TerminalViewDelegate, UIGestureR
         wsTask = nil
     }
 
+    private func sendBytes(_ data: Data) {
+        wsTask?.send(.data(data)) { _ in }
+    }
+
     private func receive() {
         wsTask?.receive { [weak self] result in
             guard let self else { return }
@@ -86,16 +143,13 @@ final class JCDETerminalHostView: TerminalView, TerminalViewDelegate, UIGestureR
             case .success(let msg):
                 switch msg {
                 case .data(let data):
-                    let bytes = [UInt8](data)
-                    DispatchQueue.main.async { self.feed(byteArray: bytes[...]) }
+                    DispatchQueue.main.async { self.feed(byteArray: [UInt8](data)[...]) }
                 case .string(let text):
                     DispatchQueue.main.async { self.feed(text: text) }
-                @unknown default:
-                    break
+                @unknown default: break
                 }
                 self.receive()
-            case .failure:
-                break
+            case .failure: break
             }
         }
     }
@@ -124,26 +178,20 @@ final class JCDETerminalHostView: TerminalView, TerminalViewDelegate, UIGestureR
     deinit { wsTask?.cancel() }
 }
 
-// MARK: - UIKit container: holds all open tabs' terminals, only active visible.
-// Single representable (no SwiftUI ZStack) so the active terminal's native
-// scroll isn't intercepted by SwiftUI's gesture arena on iPadOS 26.
+// MARK: - Scroll controller (drives the active terminal from the tab bar)
 
-/// Lets the SwiftUI tab bar's scroll buttons drive the active terminal.
 final class TerminalScrollController: ObservableObject {
     weak var container: TerminalHostContainer?
     func up() { container?.scrollActive(lines: 10, up: true) }
     func down() { container?.scrollActive(lines: 10, up: false) }
 }
 
+// MARK: - UIKit container: all open tabs live at once, only active visible.
+
 final class TerminalHostContainer: UIView {
     private var hosts: [String: JCDETerminalHostView] = [:]
     private var projects: [Project] = []
     private var activeKey: String?
-
-    func scrollActive(lines: Int, up: Bool) {
-        guard let key = activeKey, let host = hosts[key] else { return }
-        if up { host.scrollLinesUp(lines) } else { host.scrollLinesDown(lines) }
-    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -155,24 +203,26 @@ final class TerminalHostContainer: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    func scrollActive(lines: Int, up: Bool) {
+        guard let key = activeKey, let host = hosts[key] else { return }
+        if up { host.scrollLinesUp(lines) } else { host.scrollLinesDown(lines) }
+    }
+
     func sync(projects: [Project], activeKey: String?) {
         self.projects = projects
         self.activeKey = activeKey
         let liveKeys = Set(projects.map { $0.key })
 
-        // Remove closed tabs
         for (key, host) in hosts where !liveKeys.contains(key) {
             host.teardown()
             host.removeFromSuperview()
             hosts.removeValue(forKey: key)
         }
-        // Add newly opened tabs (stay alive once created)
         for project in projects where hosts[project.key] == nil {
             let host = makeHost(project)
             addSubview(host)
             hosts[project.key] = host
         }
-        // Show active on top, hide the rest — all remain connected
         for (key, host) in hosts {
             let isActive = (key == activeKey)
             host.isActiveTab = isActive
@@ -180,7 +230,7 @@ final class TerminalHostContainer: UIView {
             host.frame = bounds
             if isActive {
                 bringSubviewToFront(host)
-                host.focusSoon()
+                host.focusKeyboard()
             }
         }
     }
@@ -192,9 +242,8 @@ final class TerminalHostContainer: UIView {
         return host
     }
 
-    // Automates the "close/reopen the tab and it works" fix: on return to
-    // foreground, rebuild the active tab's view fresh (reconnects, server
-    // replays scrollback). Background tabs are left untouched.
+    // Pop-back-in fix: rebuild the active tab fresh on foreground (automates the
+    // "close/reopen the tab" trick). Background tabs untouched; server replays.
     @objc private func appForeground() {
         guard let key = activeKey,
               let old = hosts[key],
@@ -209,7 +258,7 @@ final class TerminalHostContainer: UIView {
         addSubview(host)
         bringSubviewToFront(host)
         hosts[key] = host
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { host.focusSoon() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { host.focusKeyboard() }
     }
 
     override func layoutSubviews() {
