@@ -2,123 +2,28 @@ import SwiftUI
 import SwiftTerm
 import UIKit
 
-// MARK: - Keyboard Proxy
-// An invisible text field handles typing so the SwiftTerm view is NEVER the
-// first responder — which leaves its native UIScrollView scrolling fully intact.
-// (Making the terminal itself the responder is what broke scroll.)
-
-final class KeyboardProxy: UITextField, UITextFieldDelegate {
-    var onBytes: ((Data) -> Void)?
-
-    override init(frame: CGRect) {
-        super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-        alpha = 0.011
-        delegate = self
-        autocorrectionType = .no
-        autocapitalizationType = .none
-        spellCheckingType = .no
-        smartDashesType = .no
-        smartQuotesType = .no
-        smartInsertDeleteType = .no
-        keyboardType = .asciiCapable
-        returnKeyType = .default
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
-
-    override var canBecomeFirstResponder: Bool { true }
-    override var hasText: Bool { true }
-
-    func textField(_ tf: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-        if string.isEmpty {
-            onBytes?(Data([0x7f]))
-        } else {
-            onBytes?(string.data(using: .utf8) ?? Data())
-        }
-        return false
-    }
-
-    func textFieldShouldReturn(_ tf: UITextField) -> Bool {
-        onBytes?(Data([0x0d]))
-        return false
-    }
-
-    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
-        for press in presses {
-            guard let key = press.key else { continue }
-            switch key.keyCode {
-            case .keyboardDeleteOrBackspace: onBytes?(Data([0x7f])); return
-            case .keyboardReturnOrEnter:     onBytes?(Data([0x0d])); return
-            case .keyboardTab:               onBytes?(Data([0x09])); return
-            case .keyboardEscape:            onBytes?(Data([0x1b])); return
-            default: break
-            }
-        }
-        super.pressesBegan(presses, with: event)
-    }
-}
-
-// MARK: - Terminal Host View (native scroll preserved)
+// MARK: - Terminal Host View
+// VANILLA SwiftTerm — add NOTHING to it. SwiftTerm sets up its own gesture
+// recognizers (single-tap → becomeFirstResponder for keyboard, pan → scroll,
+// double/triple-tap → selection). Adding our own tap gesture or a separate
+// KeyboardProxy steals first-responder status and BREAKS SwiftTerm's native
+// scroll. The first working version touched nothing — so neither do we.
 
 final class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
     var isActiveTab: Bool = true
-    private var projectKey: String?
-    private let keyProxy = KeyboardProxy()
-    private var lastSize: CGSize = .zero
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
         font = UIFont.monospacedSystemFont(ofSize: 17, weight: .regular)
-
-        keyProxy.onBytes = { [weak self] data in self?.sendBytes(data) }
-        addSubview(keyProxy)
-
-        let tap = UITapGestureRecognizer(target: self, action: #selector(focusKeyboard))
-        tap.cancelsTouchesInView = false
-        addGestureRecognizer(tap)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    // Stop iOS from yanking scroll to the keyProxy when it takes focus
-    override func scrollRectToVisible(_ rect: CGRect, animated: Bool) {
-        guard rect != keyProxy.frame else { return }
-        super.scrollRectToVisible(rect, animated: animated)
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        guard bounds.size != lastSize else { return }
-        lastSize = bounds.size
-        let t = getTerminal()
-        sizeChanged(source: self, newCols: t.cols, newRows: t.rows)
-    }
-
-    @objc func focusKeyboard() {
-        guard isActiveTab else { return }
-        keyProxy.becomeFirstResponder()
-    }
-
-    // Scroll buttons use SwiftTerm's own scrollback API (bonus alongside native scroll)
-    func scrollLinesUp(_ n: Int) { scrollUp(lines: n) }
-    func scrollLinesDown(_ n: Int) { scrollDown(lines: n) }
-
-    override func didMoveToWindow() {
-        super.didMoveToWindow()
-        if window != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-                guard let self, self.isActiveTab else { return }
-                self.focusKeyboard()
-            }
-        }
-    }
-
     func connect(projectKey: String) {
-        self.projectKey = projectKey
         let urlString = "ws://\(ProjectsStore.baseHost)/projects/\(projectKey)/terminal"
         guard let url = URL(string: urlString) else { return }
         wsSession = URLSession(configuration: .default)
@@ -130,10 +35,6 @@ final class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     func teardown() {
         wsTask?.cancel()
         wsTask = nil
-    }
-
-    private func sendBytes(_ data: Data) {
-        wsTask?.send(.data(data)) { _ in }
     }
 
     private func receive() {
@@ -178,15 +79,9 @@ final class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     deinit { wsTask?.cancel() }
 }
 
-// MARK: - Scroll controller (drives the active terminal from the tab bar)
-
-final class TerminalScrollController: ObservableObject {
-    weak var container: TerminalHostContainer?
-    func up() { container?.scrollActive(lines: 10, up: true) }
-    func down() { container?.scrollActive(lines: 10, up: false) }
-}
-
 // MARK: - UIKit container: all open tabs live at once, only active visible.
+// Hosts vanilla SwiftTerm views as subviews and toggles isHidden — it adds NO
+// gestures to the terminals, so their native scroll/keyboard stay intact.
 
 final class TerminalHostContainer: UIView {
     private var hosts: [String: JCDETerminalHostView] = [:]
@@ -202,11 +97,6 @@ final class TerminalHostContainer: UIView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
-
-    func scrollActive(lines: Int, up: Bool) {
-        guard let key = activeKey, let host = hosts[key] else { return }
-        if up { host.scrollLinesUp(lines) } else { host.scrollLinesDown(lines) }
-    }
 
     func sync(projects: [Project], activeKey: String?) {
         self.projects = projects
@@ -228,10 +118,7 @@ final class TerminalHostContainer: UIView {
             host.isActiveTab = isActive
             host.isHidden = !isActive
             host.frame = bounds
-            if isActive {
-                bringSubviewToFront(host)
-                host.focusKeyboard()
-            }
+            if isActive { bringSubviewToFront(host) }
         }
     }
 
@@ -243,7 +130,7 @@ final class TerminalHostContainer: UIView {
     }
 
     // Pop-back-in fix: rebuild the active tab fresh on foreground (automates the
-    // "close/reopen the tab" trick). Background tabs untouched; server replays.
+    // "close/reopen the tab" trick). Server replays scrollback on reconnect.
     @objc private func appForeground() {
         guard let key = activeKey,
               let old = hosts[key],
@@ -258,7 +145,6 @@ final class TerminalHostContainer: UIView {
         addSubview(host)
         bringSubviewToFront(host)
         hosts[key] = host
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { host.focusKeyboard() }
     }
 
     override func layoutSubviews() {
@@ -272,18 +158,15 @@ final class TerminalHostContainer: UIView {
 struct TerminalContainer: UIViewRepresentable {
     let projects: [Project]
     let activeKey: String?
-    var controller: TerminalScrollController? = nil
 
     func makeUIView(context: Context) -> TerminalHostContainer {
         let c = TerminalHostContainer(frame: .zero)
         c.backgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
-        controller?.container = c
         c.sync(projects: projects, activeKey: activeKey)
         return c
     }
 
     func updateUIView(_ uiView: TerminalHostContainer, context: Context) {
-        controller?.container = uiView
         uiView.sync(projects: projects, activeKey: activeKey)
     }
 }

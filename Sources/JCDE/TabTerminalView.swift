@@ -5,7 +5,6 @@ struct TabTerminalView: View {
     @Binding var activeProject: Project?
     @State private var showProjectPicker = false
     @StateObject private var store = ProjectsStore()
-    @StateObject private var scrollController = TerminalScrollController()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,20 +32,6 @@ struct TabTerminalView: View {
                             )
                         }
                     }
-                }
-
-                // Scroll buttons — drive SwiftTerm's scrollback directly
-                Button { scrollController.up() } label: {
-                    Image(systemName: "chevron.up")
-                        .font(.system(size: 15))
-                        .foregroundColor(Color(hex: "7B7BFF"))
-                        .frame(width: 40, height: 44)
-                }
-                Button { scrollController.down() } label: {
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 15))
-                        .foregroundColor(Color(hex: "7B7BFF"))
-                        .frame(width: 40, height: 44)
                 }
 
                 // Open URL for active project
@@ -77,7 +62,7 @@ struct TabTerminalView: View {
                 .frame(height: 1)
 
             // Terminal views — all alive in one UIKit container, only active visible
-            TerminalContainer(projects: openProjects, activeKey: activeProject?.key, controller: scrollController)
+            TerminalContainer(projects: openProjects, activeKey: activeProject?.key)
                 .ignoresSafeArea(.container, edges: .bottom)
         }
         .background(Color(hex: "0E0E12"))
