@@ -9,7 +9,9 @@ struct TabTerminalView: View {
     @State private var showNewSessionConfirm = false
     @State private var focusTrigger = 0
     @State private var showTapToType = false
+    @State private var didBackground = false
     @State private var sendBytesAction: ((Data) -> Void)? = nil
+    @State private var focusAction: (() -> Void)? = nil
     @StateObject private var store = ProjectsStore()
 
     let controlKeys: [(String, [UInt8])] = [
@@ -88,27 +90,28 @@ struct TabTerminalView: View {
                         isActive: activeProject?.key == project.key,
                         newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0,
                         focusTrigger: activeProject?.key == project.key ? focusTrigger : 0,
-                        sendBytesAction: $sendBytesAction
+                        sendBytesAction: $sendBytesAction,
+                        focusAction: $focusAction
                     )
                 }
 
-                // Tap-to-type overlay after app resume
+                // Tap-to-type overlay — only after returning from background
                 if showTapToType {
                     Color.clear
                         .contentShape(Rectangle())
                         .onTapGesture {
                             showTapToType = false
-                            focusTrigger += 1
+                            focusAction?()
                         }
                         .overlay(
                             Text("Tap to type")
                                 .font(.system(size: 14))
-                                .foregroundColor(Color(hex: "7B7BFF").opacity(0.6))
+                                .foregroundColor(Color(hex: "7B7BFF").opacity(0.8))
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                                 .background(Color(hex: "22222A").opacity(0.9))
                                 .cornerRadius(10)
-                                .padding(.bottom, 20),
+                                .padding(.bottom, 60),
                             alignment: .bottom
                         )
                 }
@@ -152,8 +155,14 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            didBackground = true
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            showTapToType = true
+            if didBackground {
+                didBackground = false
+                showTapToType = true
+            }
         }
         .confirmationDialog(
             "Start a new Claude session for \(activeProject?.name ?? "this project")?",

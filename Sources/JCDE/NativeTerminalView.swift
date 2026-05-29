@@ -8,6 +8,7 @@ struct NativeTerminalView: UIViewRepresentable {
     var newSessionTrigger: Int = 0
     var focusTrigger: Int = 0
     @Binding var sendBytesAction: ((Data) -> Void)?
+    @Binding var focusAction: (() -> Void)?
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
         let view = JCDETerminalHostView(frame: .zero)
@@ -23,6 +24,7 @@ struct NativeTerminalView: UIViewRepresentable {
 
         if isActive {
             sendBytesAction = { data in uiView.sendBytesPublic(data) }
+            focusAction = { uiView.focusKeyboard() }
         }
 
         if focusTrigger != coord.lastFocusTrigger {
