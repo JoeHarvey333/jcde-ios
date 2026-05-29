@@ -13,10 +13,12 @@ struct NativeTerminalView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {
+        uiView.isHidden = !isActive
         uiView.isActiveTab = isActive
         if isActive {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 uiView.becomeFirstResponder()
+                uiView.reloadInputViews()
             }
         }
     }
@@ -71,8 +73,9 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     @objc private func windowDidBecomeKey() {
         guard isActiveTab, window?.isKeyWindow == true else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            guard let self, self.isActiveTab, !self.isFirstResponder else { return }
+            guard let self, self.isActiveTab else { return }
             self.becomeFirstResponder()
+            self.reloadInputViews()
         }
     }
 

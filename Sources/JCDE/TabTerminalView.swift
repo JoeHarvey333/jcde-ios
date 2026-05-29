@@ -78,8 +78,6 @@ struct TabTerminalView: View {
             ZStack {
                 ForEach(openProjects) { project in
                     NativeTerminalView(project: project, isActive: activeProject?.key == project.key, focusTrigger: activeProject?.key == project.key ? focusTrigger : 0)
-                        .opacity(activeProject?.key == project.key ? 1 : 0)
-                        .allowsHitTesting(activeProject?.key == project.key)
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
