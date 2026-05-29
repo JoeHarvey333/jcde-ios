@@ -4,25 +4,51 @@ import UIKit
 
 // MARK: - SwiftTerm host view (one per project, owns its WebSocket)
 
-final class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
+final class JCDETerminalHostView: TerminalView, TerminalViewDelegate, UIGestureRecognizerDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
     var isActiveTab: Bool = true
+    private var panAccum: CGFloat = 0
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
-        font = UIFont.monospacedSystemFont(ofSize: 16, weight: .regular)
+        font = UIFont.monospacedSystemFont(ofSize: 17, weight: .regular)
         inputAssistantItem.leadingBarButtonGroups = []
         inputAssistantItem.trailingBarButtonGroups = []
 
         let tap = UITapGestureRecognizer(target: self, action: #selector(focusSoon))
         tap.cancelsTouchesInView = false
         addGestureRecognizer(tap)
+
+        // Custom pan → SwiftTerm's own scrollUp/scrollDown (bypasses the iPadOS
+        // gesture arena, which eats the built-in scroll view pan on 26.5).
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        pan.delegate = self
+        pan.cancelsTouchesInView = false
+        addGestureRecognizer(pan)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+    @objc private func handlePan(_ g: UIPanGestureRecognizer) {
+        if g.state == .began { panAccum = 0 }
+        let t = g.translation(in: self)
+        g.setTranslation(.zero, in: self)
+        panAccum += t.y
+        let step: CGFloat = 22   // ~one text line of drag
+        let lines = Int(panAccum / step)
+        if lines != 0 {
+            if lines > 0 { scrollUp(lines: lines) } else { scrollDown(lines: -lines) }
+            panAccum -= CGFloat(lines) * step
+        }
+    }
+
+    func scrollLinesUp(_ n: Int) { scrollUp(lines: n) }
+    func scrollLinesDown(_ n: Int) { scrollDown(lines: n) }
 
     @objc func focusSoon() {
         guard isActiveTab, !isFirstResponder else { return }
@@ -102,10 +128,22 @@ final class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 // Single representable (no SwiftUI ZStack) so the active terminal's native
 // scroll isn't intercepted by SwiftUI's gesture arena on iPadOS 26.
 
+/// Lets the SwiftUI tab bar's scroll buttons drive the active terminal.
+final class TerminalScrollController: ObservableObject {
+    weak var container: TerminalHostContainer?
+    func up() { container?.scrollActive(lines: 10, up: true) }
+    func down() { container?.scrollActive(lines: 10, up: false) }
+}
+
 final class TerminalHostContainer: UIView {
     private var hosts: [String: JCDETerminalHostView] = [:]
     private var projects: [Project] = []
     private var activeKey: String?
+
+    func scrollActive(lines: Int, up: Bool) {
+        guard let key = activeKey, let host = hosts[key] else { return }
+        if up { host.scrollLinesUp(lines) } else { host.scrollLinesDown(lines) }
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -185,15 +223,18 @@ final class TerminalHostContainer: UIView {
 struct TerminalContainer: UIViewRepresentable {
     let projects: [Project]
     let activeKey: String?
+    var controller: TerminalScrollController? = nil
 
     func makeUIView(context: Context) -> TerminalHostContainer {
         let c = TerminalHostContainer(frame: .zero)
         c.backgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
+        controller?.container = c
         c.sync(projects: projects, activeKey: activeKey)
         return c
     }
 
     func updateUIView(_ uiView: TerminalHostContainer, context: Context) {
+        controller?.container = uiView
         uiView.sync(projects: projects, activeKey: activeKey)
     }
 }
