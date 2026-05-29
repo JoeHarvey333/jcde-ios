@@ -22,9 +22,9 @@ struct ContentView: View {
             .navigationTitle("JCDE")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .bottomBar) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
-                        .font(.system(size: 12))
+                        .font(.system(size: 13))
                         .foregroundColor(Color(hex: "555560"))
                 }
             }

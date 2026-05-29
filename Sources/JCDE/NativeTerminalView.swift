@@ -134,7 +134,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         super.init(frame: frame)
         terminalDelegate = self
         nativeBackgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
-        font = UIFont.monospacedSystemFont(ofSize: 16, weight: .regular)
+        font = UIFont.monospacedSystemFont(ofSize: 18, weight: .regular)
 
         // Proxy keyboard setup
         controlBar.onKey = { [weak self] data in self?.sendBytes(data) }
