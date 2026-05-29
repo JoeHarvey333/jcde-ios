@@ -3,12 +3,12 @@ import SwiftUI
 struct TabTerminalView: View {
     @Binding var openProjects: [Project]
     @Binding var activeProject: Project?
-    @Binding var shouldFocus: Bool
     @Environment(\.dismiss) private var dismiss
     @State private var showProjectPicker = false
     @State private var newSessionTrigger = 0
     @State private var showNewSessionConfirm = false
     @State private var showTapToType = false
+    @State private var didBackground = false
     @State private var focusAction: (() -> Void)? = nil
     @StateObject private var store = ProjectsStore()
 
@@ -105,13 +105,16 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
-        .onChange(of: shouldFocus) { newValue in
-            guard newValue else { return }
-            shouldFocus = false
-            showTapToType = true
-            focusAction?()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                showTapToType = false
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+            didBackground = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            if didBackground {
+                didBackground = false
+                showTapToType = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    showTapToType = false
+                }
             }
         }
         .confirmationDialog(

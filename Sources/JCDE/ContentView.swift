@@ -4,8 +4,6 @@ struct ContentView: View {
     @StateObject private var store = ProjectsStore()
     @State private var openProjects: [Project] = []
     @State private var activeProject: Project?
-    @State private var shouldFocusTerminal = false
-    @State private var appDidBackground = false
 
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
@@ -35,25 +33,10 @@ struct ContentView: View {
                 get: { activeProject != nil },
                 set: { if !$0 { activeProject = nil } }
             )) {
-                TabTerminalView(openProjects: $openProjects, activeProject: $activeProject, shouldFocus: $shouldFocusTerminal)
+                TabTerminalView(openProjects: $openProjects, activeProject: $activeProject)
             }
         }
         .task { await store.load() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            if activeProject != nil { appDidBackground = true }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            guard appDidBackground, activeProject != nil else { return }
-            appDidBackground = false
-            let saved = activeProject
-            activeProject = nil
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                activeProject = saved
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.75) {
-                    shouldFocusTerminal = true
-                }
-            }
-        }
     }
 
     private func open(_ project: Project) {
