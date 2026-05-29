@@ -43,8 +43,14 @@ final class TerminalHostContainer: UIView {
         wv.backgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
         wv.scrollView.isScrollEnabled = false   // JS (xterm.js) owns scrolling
         wv.scrollView.bounces = false
-        let url = URL(string: "http://\(ProjectsStore.baseHost)/projects/\(project.key)/terminal-native")!
-        wv.load(URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData))
+        var comps = URLComponents(string: "http://\(ProjectsStore.baseHost)/terminal-native.html")!
+        let shortHost = project.host.map { ".\($0.split(separator: ".").last ?? "92")" } ?? ".92"
+        comps.queryItems = [
+            URLQueryItem(name: "key", value: project.key),
+            URLQueryItem(name: "name", value: project.name),
+            URLQueryItem(name: "host", value: shortHost),
+        ]
+        wv.load(URLRequest(url: comps.url!, cachePolicy: .reloadIgnoringLocalCacheData))
         return wv
     }
 
