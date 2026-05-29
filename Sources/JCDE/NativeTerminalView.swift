@@ -6,6 +6,7 @@ struct NativeTerminalView: UIViewRepresentable {
     let project: Project
     var isActive: Bool = true
     var focusTrigger: Int = 0
+    var newSessionTrigger: Int = 0
 
     func makeUIView(context: Context) -> JCDETerminalHostView {
         let view = JCDETerminalHostView(frame: .zero)
@@ -21,6 +22,15 @@ struct NativeTerminalView: UIViewRepresentable {
                 uiView.focusKeyboard()
             }
         }
+        if newSessionTrigger != context.coordinator.lastNewSessionTrigger {
+            context.coordinator.lastNewSessionTrigger = newSessionTrigger
+            uiView.newSession()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    class Coordinator {
+        var lastNewSessionTrigger = 0
     }
 }
 
@@ -117,6 +127,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
     var isActiveTab: Bool = true
+    private var projectKey: String?
 
     private let keyProxy = KeyboardProxy()
     private let controlBar = TerminalControlBar()
@@ -187,12 +198,26 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     }
 
     func connect(projectKey: String) {
+        self.projectKey = projectKey
         let urlString = "ws://\(ProjectsStore.baseHost)/projects/\(projectKey)/terminal"
         guard let url = URL(string: urlString) else { return }
         wsSession = URLSession(configuration: .default)
         wsTask = wsSession?.webSocketTask(with: url)
         wsTask?.resume()
         receive()
+    }
+
+    func newSession() {
+        wsTask?.cancel()
+        wsTask = nil
+        guard let key = projectKey,
+              let url = URL(string: "http://\(ProjectsStore.baseHost)/projects/\(key)/terminal") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "DELETE"
+        URLSession.shared.dataTask(with: req) { [weak self] _, _, _ in
+            DispatchQueue.main.async { self?.connect(projectKey: key) }
+        }.resume()
+        feed(text: "\r\n\u{1b}[2m[starting new session…]\u{1b}[0m\r\n")
     }
 
     private func sendBytes(_ data: Data) {

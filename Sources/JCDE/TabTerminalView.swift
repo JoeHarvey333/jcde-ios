@@ -7,6 +7,8 @@ struct TabTerminalView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showProjectPicker = false
     @State private var focusTrigger = 0
+    @State private var newSessionTrigger = 0
+    @State private var showNewSessionConfirm = false
     @StateObject private var store = ProjectsStore()
 
     var body: some View {
@@ -47,6 +49,16 @@ struct TabTerminalView: View {
                     }
                 }
 
+                // New session button
+                Button {
+                    showNewSessionConfirm = true
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 15))
+                        .foregroundColor(Color(hex: "7B7BFF"))
+                        .frame(width: 44, height: 44)
+                }
+
                 // Keyboard restore button
                 Button {
                     focusTrigger += 1
@@ -77,7 +89,12 @@ struct TabTerminalView: View {
             // Terminal views — all alive, only active visible
             ZStack {
                 ForEach(openProjects) { project in
-                    NativeTerminalView(project: project, isActive: activeProject?.key == project.key, focusTrigger: activeProject?.key == project.key ? focusTrigger : 0)
+                    NativeTerminalView(
+                        project: project,
+                        isActive: activeProject?.key == project.key,
+                        focusTrigger: activeProject?.key == project.key ? focusTrigger : 0,
+                        newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0
+                    )
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -96,6 +113,16 @@ struct TabTerminalView: View {
         .task { await store.load() }
         .onChange(of: scenePhase) { phase in
             if phase == .active { focusTrigger += 1 }
+        }
+        .confirmationDialog(
+            "Start a new Claude session for \(activeProject?.name ?? "this project")?",
+            isPresented: $showNewSessionConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("New Session", role: .destructive) { newSessionTrigger += 1 }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The current session and context will be cleared. Chat history is preserved.")
         }
     }
 
