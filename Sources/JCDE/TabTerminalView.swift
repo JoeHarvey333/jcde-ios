@@ -78,7 +78,6 @@ struct TabTerminalView: View {
             }
             .frame(height: 44)
             .background(Color(hex: "16161E"))
-            .padding(.top, safeAreaTop)
 
             Rectangle().fill(Color(hex: "2A2A35")).frame(height: 1)
 
@@ -140,14 +139,11 @@ struct TabTerminalView: View {
                     .padding(.horizontal, 8)
                 }
                 .frame(height: 44)
-                // Safe area spacer below control bar (above home indicator)
-                Color(hex: "16161E").frame(height: safeAreaBottom)
             }
             .background(Color(hex: "16161E"))
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
-        .ignoresSafeArea()
         .sheet(isPresented: $showProjectPicker) {
             ProjectPickerSheet(projects: store.projects, openKeys: Set(openProjects.map { $0.key })) { project in
                 if !openProjects.contains(where: { $0.key == project.key }) {
@@ -177,18 +173,6 @@ struct TabTerminalView: View {
         } message: {
             Text("The current session and context will be cleared. Chat history is preserved.")
         }
-    }
-
-    private var safeAreaTop: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.windows.first?.safeAreaInsets.top ?? 0
-    }
-
-    private var safeAreaBottom: CGFloat {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.windows.first?.safeAreaInsets.bottom ?? 0
     }
 
     private func closeTab(_ project: Project) {
