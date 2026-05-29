@@ -10,9 +10,14 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: AJ3GSWSC4K
-    MARKETING_VERSION: "1.5.2"
-    CURRENT_PROJECT_VERSION: "41"
+    MARKETING_VERSION: "1.5.3"
+    CURRENT_PROJECT_VERSION: "42"
     ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.13.0
 
 targets:
   JCDE:
@@ -22,6 +27,9 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - path: Sources/JCDE
+    dependencies:
+      - package: SwiftTerm
+        product: SwiftTerm
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.jcde

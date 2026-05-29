@@ -3,7 +3,6 @@ import SwiftUI
 struct TabTerminalView: View {
     @Binding var openProjects: [Project]
     @Binding var activeProject: Project?
-    @Environment(\.dismiss) private var dismiss
     @State private var showProjectPicker = false
     @StateObject private var store = ProjectsStore()
 
@@ -11,9 +10,9 @@ struct TabTerminalView: View {
         VStack(spacing: 0) {
             // Tab bar
             HStack(spacing: 0) {
-                // Grid icon — back to project list (keeps tabs alive)
+                // Grid icon — back to project list (keeps open tabs in the list)
                 Button {
-                    dismiss()
+                    activeProject = nil
                 } label: {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 15))
@@ -86,7 +85,7 @@ struct TabTerminalView: View {
             activeProject = openProjects.last
         }
         if openProjects.isEmpty {
-            dismiss()
+            activeProject = nil
         }
     }
 }

@@ -8,32 +8,34 @@ struct ContentView: View {
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(store.projects) { project in
-                        ProjectCard(project: project)
-                            .onTapGesture { open(project) }
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-            }
-            .navigationTitle("JCDE")
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
-                        .font(.system(size: 13))
-                        .foregroundColor(Color(hex: "555560"))
-                }
-            }
-            .background(Color(hex: "0E0E12"))
-            .fullScreenCover(isPresented: Binding(
-                get: { activeProject != nil },
-                set: { if !$0 { activeProject = nil } }
-            )) {
+        Group {
+            if activeProject != nil {
+                // Plain view swap — NOT a modal. Avoids fullScreenCover's gesture
+                // layer, which iPadOS 26 uses to intercept the terminal's scroll.
                 TabTerminalView(openProjects: $openProjects, activeProject: $activeProject)
+            } else {
+                NavigationStack {
+                    ScrollView {
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(store.projects) { project in
+                                ProjectCard(project: project)
+                                    .onTapGesture { open(project) }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                    .navigationTitle("JCDE")
+                    .navigationBarTitleDisplayMode(.large)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                                .font(.system(size: 13))
+                                .foregroundColor(Color(hex: "555560"))
+                        }
+                    }
+                    .background(Color(hex: "0E0E12"))
+                }
             }
         }
         .task { await store.load() }
