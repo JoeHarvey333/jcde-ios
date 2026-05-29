@@ -101,7 +101,7 @@ class KeyboardProxy: UITextField, UITextFieldDelegate {
 
     override init(frame: CGRect) {
         super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
-        alpha = 0.01  // invisible but within bounds so becomeFirstResponder works
+        alpha = 0.011  // invisible but within bounds so becomeFirstResponder works
         delegate = self
         autocorrectionType = .no
         autocapitalizationType = .none
@@ -170,13 +170,18 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    // Prevent iOS from scrolling the terminal when keyProxy becomes first responder
+    override func scrollRectToVisible(_ rect: CGRect, animated: Bool) {
+        guard rect != keyProxy.frame else { return }
+        super.scrollRectToVisible(rect, animated: animated)
+    }
+
     @objc func focusKeyboard() {
         focusKeyboardWithRetry()
     }
 
     func focusKeyboardWithRetry(attempt: Int = 0) {
         if keyProxy.becomeFirstResponder() {
-            keyProxy.reloadInputViews()
             return
         }
         // Retry up to 4 times with increasing delays if becomeFirstResponder fails
