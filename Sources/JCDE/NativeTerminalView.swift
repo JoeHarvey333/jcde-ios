@@ -117,6 +117,29 @@ class KeyboardProxy: UITextField, UITextFieldDelegate {
         onBytes?(Data([0x0d]))
         return false
     }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        for press in presses {
+            guard let key = press.key else { continue }
+            switch key.keyCode {
+            case .keyboardDeleteOrBackspace:
+                onBytes?(Data([0x7f]))
+                return
+            case .keyboardReturnOrEnter:
+                onBytes?(Data([0x0d]))
+                return
+            case .keyboardTab:
+                onBytes?(Data([0x09]))
+                return
+            case .keyboardEscape:
+                onBytes?(Data([0x1b]))
+                return
+            default:
+                break
+            }
+        }
+        super.pressesBegan(presses, with: event)
+    }
 }
 
 // MARK: - Terminal Host View
