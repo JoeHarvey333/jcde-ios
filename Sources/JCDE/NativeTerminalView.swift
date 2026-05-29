@@ -11,7 +11,8 @@ struct NativeTerminalView: UIViewRepresentable {
         let wv = WKWebView(frame: .zero, configuration: config)
         wv.isOpaque = true
         wv.backgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.071, alpha: 1)
-        wv.scrollView.isScrollEnabled = false  // xterm.js manages its own scroll
+        wv.scrollView.bounces = false
+        wv.scrollView.bouncesZoom = false
         let url = URL(string: "http://\(ProjectsStore.baseHost)/terminal-page/\(project.key)")!
         wv.load(URLRequest(url: url))
         return wv
