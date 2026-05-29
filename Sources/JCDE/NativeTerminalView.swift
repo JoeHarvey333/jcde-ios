@@ -15,7 +15,7 @@ struct NativeTerminalView: UIViewRepresentable {
     func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {
         uiView.isActiveTab = isActive
         if isActive {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 uiView.becomeFirstResponder()
             }
         }

@@ -47,6 +47,16 @@ struct TabTerminalView: View {
                     }
                 }
 
+                // Keyboard restore button
+                Button {
+                    focusTrigger += 1
+                } label: {
+                    Image(systemName: "keyboard")
+                        .font(.system(size: 15))
+                        .foregroundColor(Color(hex: "7B7BFF"))
+                        .frame(width: 44, height: 44)
+                }
+
                 // + button to add a tab
                 Button {
                     showProjectPicker = true
