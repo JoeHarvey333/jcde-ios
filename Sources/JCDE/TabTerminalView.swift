@@ -7,23 +7,37 @@ struct TabTerminalView: View {
     @State private var showProjectPicker = false
     @State private var newSessionTrigger = 0
     @State private var showNewSessionConfirm = false
+    @State private var focusTrigger = 0
+    @State private var showTapToType = false
+    @State private var sendBytesAction: ((Data) -> Void)? = nil
     @StateObject private var store = ProjectsStore()
+
+    let controlKeys: [(String, [UInt8])] = [
+        ("◀", [0x1b, 0x5b, 0x44]),
+        ("▶", [0x1b, 0x5b, 0x43]),
+        ("▲", [0x1b, 0x5b, 0x41]),
+        ("▼", [0x1b, 0x5b, 0x42]),
+        ("Esc", [0x1b]),
+        ("Tab", [0x09]),
+        ("^C", [0x03]),
+        ("^A", [0x01]),
+        ("^E", [0x05]),
+        ("^B", [0x02]),
+        ("^D", [0x04]),
+        ("^L", [0x0c]),
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
-            // Tab bar
+            // Tab bar — sits below status bar
             HStack(spacing: 0) {
-                // Grid icon — back to project list (keeps tabs alive)
-                Button {
-                    dismiss()
-                } label: {
+                Button { dismiss() } label: {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 15))
                         .foregroundColor(Color(hex: "7B7BFF"))
                         .frame(width: 44, height: 44)
                 }
 
-                // Tabs
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(openProjects) { project in
@@ -37,7 +51,6 @@ struct TabTerminalView: View {
                     }
                 }
 
-                // Open URL for active project
                 if let urlString = activeProject?.url, let url = URL(string: urlString) {
                     Link(destination: url) {
                         Text("Open ↗")
@@ -47,20 +60,14 @@ struct TabTerminalView: View {
                     }
                 }
 
-                // New session button
-                Button {
-                    showNewSessionConfirm = true
-                } label: {
+                Button { showNewSessionConfirm = true } label: {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 15))
                         .foregroundColor(Color(hex: "7B7BFF"))
                         .frame(width: 44, height: 44)
                 }
 
-                // + button to add a tab
-                Button {
-                    showProjectPicker = true
-                } label: {
+                Button { showProjectPicker = true } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 15))
                         .foregroundColor(Color(hex: "7B7BFF"))
@@ -69,25 +76,72 @@ struct TabTerminalView: View {
             }
             .frame(height: 44)
             .background(Color(hex: "16161E"))
+            .padding(.top, safeAreaTop)
 
-            Rectangle()
-                .fill(Color(hex: "2A2A35"))
-                .frame(height: 1)
+            Rectangle().fill(Color(hex: "2A2A35")).frame(height: 1)
 
-            // Terminal views — all alive, only active visible
+            // Terminal views
             ZStack {
                 ForEach(openProjects) { project in
                     NativeTerminalView(
                         project: project,
                         isActive: activeProject?.key == project.key,
-                        newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0
+                        newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0,
+                        focusTrigger: activeProject?.key == project.key ? focusTrigger : 0,
+                        sendBytesAction: $sendBytesAction
                     )
+                }
+
+                // Tap-to-type overlay after app resume
+                if showTapToType {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            showTapToType = false
+                            focusTrigger += 1
+                        }
+                        .overlay(
+                            Text("Tap to type")
+                                .font(.system(size: 14))
+                                .foregroundColor(Color(hex: "7B7BFF").opacity(0.6))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color(hex: "22222A").opacity(0.9))
+                                .cornerRadius(10)
+                                .padding(.bottom, 20),
+                            alignment: .bottom
+                        )
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
+
+            // Control bar — always visible, not attached to keyboard (fixes hardware keyboard bar)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(controlKeys, id: \.0) { key in
+                        Button {
+                            sendBytesAction?(Data(key.1))
+                        } label: {
+                            Text(key.0)
+                                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                .foregroundColor(Color(hex: "B0B0FF"))
+                                .frame(minWidth: 36, height: 32)
+                                .padding(.horizontal, 6)
+                                .background(Color(hex: "1E1E28"))
+                                .cornerRadius(6)
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: "33333D"), lineWidth: 1))
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            .frame(height: 44)
+            .background(Color(hex: "16161E"))
+            .padding(.bottom, safeAreaBottom)
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
+        .ignoresSafeArea()
         .sheet(isPresented: $showProjectPicker) {
             ProjectPickerSheet(projects: store.projects, openKeys: Set(openProjects.map { $0.key })) { project in
                 if !openProjects.contains(where: { $0.key == project.key }) {
@@ -98,6 +152,9 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            showTapToType = true
+        }
         .confirmationDialog(
             "Start a new Claude session for \(activeProject?.name ?? "this project")?",
             isPresented: $showNewSessionConfirm,
@@ -110,14 +167,24 @@ struct TabTerminalView: View {
         }
     }
 
+    private var safeAreaTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.windows.first?.safeAreaInsets.top ?? 0
+    }
+
+    private var safeAreaBottom: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first?.windows.first?.safeAreaInsets.bottom ?? 0
+    }
+
     private func closeTab(_ project: Project) {
         openProjects.removeAll { $0.key == project.key }
         if activeProject?.key == project.key {
             activeProject = openProjects.last
         }
-        if openProjects.isEmpty {
-            dismiss()
-        }
+        if openProjects.isEmpty { dismiss() }
     }
 }
 
