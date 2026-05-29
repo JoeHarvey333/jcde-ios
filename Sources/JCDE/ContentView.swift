@@ -37,14 +37,6 @@ struct ContentView: View {
             }
         }
         .task { await store.load() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            guard activeProject != nil else { return }
-            let saved = activeProject
-            activeProject = nil
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                activeProject = saved
-            }
-        }
     }
 
     private func open(_ project: Project) {
