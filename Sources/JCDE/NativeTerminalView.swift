@@ -15,21 +15,31 @@ struct NativeTerminalView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: JCDETerminalHostView, context: Context) {
+        let coord = context.coordinator
+
         uiView.isHidden = !isActive
         uiView.isActiveTab = isActive
-        if isActive {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                uiView.focusKeyboard()
-            }
+
+        // Focus: only act when isActive or focusTrigger actually changes
+        let activeChanged = isActive != coord.lastIsActive
+        let triggerChanged = focusTrigger != coord.lastFocusTrigger
+        coord.lastIsActive = isActive
+        coord.lastFocusTrigger = focusTrigger
+
+        if isActive && (activeChanged || triggerChanged) {
+            uiView.focusKeyboardWithRetry()
         }
-        if newSessionTrigger != context.coordinator.lastNewSessionTrigger {
-            context.coordinator.lastNewSessionTrigger = newSessionTrigger
+
+        if newSessionTrigger != coord.lastNewSessionTrigger {
+            coord.lastNewSessionTrigger = newSessionTrigger
             uiView.newSession()
         }
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
     class Coordinator {
+        var lastIsActive = false
+        var lastFocusTrigger = 0
         var lastNewSessionTrigger = 0
     }
 }
@@ -90,7 +100,8 @@ class KeyboardProxy: UITextField, UITextFieldDelegate {
     var onBytes: ((Data) -> Void)?
 
     override init(frame: CGRect) {
-        super.init(frame: CGRect(x: -10, y: -10, width: 1, height: 1))
+        super.init(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        alpha = 0.01  // invisible but within bounds so becomeFirstResponder works
         delegate = self
         autocorrectionType = .no
         autocapitalizationType = .none
@@ -160,8 +171,21 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     required init?(coder: NSCoder) { fatalError() }
 
     @objc func focusKeyboard() {
-        keyProxy.becomeFirstResponder()
-        keyProxy.reloadInputViews()
+        focusKeyboardWithRetry()
+    }
+
+    func focusKeyboardWithRetry(attempt: Int = 0) {
+        if keyProxy.becomeFirstResponder() {
+            keyProxy.reloadInputViews()
+            return
+        }
+        // Retry up to 4 times with increasing delays if becomeFirstResponder fails
+        guard attempt < 4 else { return }
+        let delay = Double(attempt + 1) * 0.15
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, self.isActiveTab else { return }
+            self.focusKeyboardWithRetry(attempt: attempt + 1)
+        }
     }
 
     override func didMoveToWindow() {
@@ -169,7 +193,7 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         if window != nil {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self, self.isActiveTab else { return }
-                self.focusKeyboard()
+                self.focusKeyboardWithRetry()
             }
             NotificationCenter.default.addObserver(self, selector: #selector(onWindowKey),
                 name: UIWindow.didBecomeKeyNotification, object: nil)
@@ -185,15 +209,16 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         guard isActiveTab, window?.isKeyWindow == true else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
             guard let self, self.isActiveTab else { return }
-            self.focusKeyboard()
+            self.focusKeyboardWithRetry()
         }
     }
 
     @objc private func onAppForeground() {
         guard isActiveTab else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+        // 0.5s — app needs time to fully resume before keyboard accepts focus
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self, self.isActiveTab else { return }
-            self.focusKeyboard()
+            self.focusKeyboardWithRetry()
         }
     }
 
