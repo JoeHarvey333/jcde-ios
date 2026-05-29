@@ -178,11 +178,21 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil {
-            // Focus once on initial attach only
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self, self.isActiveTab else { return }
                 self.focusKeyboard()
             }
+            NotificationCenter.default.addObserver(self, selector: #selector(onAppForeground),
+                name: UIApplication.didBecomeActiveNotification, object: nil)
+        } else {
+            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
+        }
+    }
+
+    @objc private func onAppForeground() {
+        guard isActiveTab else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.scrollToBottom()
         }
     }
 

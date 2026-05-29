@@ -97,6 +97,7 @@ struct TabTerminalView: View {
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
+            .ignoresSafeArea(.keyboard)
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
