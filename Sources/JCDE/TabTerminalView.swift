@@ -4,7 +4,6 @@ struct TabTerminalView: View {
     @Binding var openProjects: [Project]
     @Binding var activeProject: Project?
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
     @State private var showProjectPicker = false
     @State private var focusTrigger = 0
     @State private var newSessionTrigger = 0
@@ -111,9 +110,6 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
-        .onChange(of: scenePhase) { phase in
-            if phase == .active { focusTrigger += 1 }
-        }
         .confirmationDialog(
             "Start a new Claude session for \(activeProject?.name ?? "this project")?",
             isPresented: $showNewSessionConfirm,

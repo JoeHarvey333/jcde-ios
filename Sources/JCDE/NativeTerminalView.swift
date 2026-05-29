@@ -20,14 +20,10 @@ struct NativeTerminalView: UIViewRepresentable {
         uiView.isHidden = !isActive
         uiView.isActiveTab = isActive
 
-        // Focus: only act when isActive or focusTrigger actually changes
-        let activeChanged = isActive != coord.lastIsActive
-        let triggerChanged = focusTrigger != coord.lastFocusTrigger
-        coord.lastIsActive = isActive
-        coord.lastFocusTrigger = focusTrigger
-
-        if isActive && (activeChanged || triggerChanged) {
-            uiView.focusKeyboardWithRetry()
+        // Focus: explicit tap on ⌨ button or tab switch
+        if focusTrigger != coord.lastFocusTrigger {
+            coord.lastFocusTrigger = focusTrigger
+            if isActive { uiView.focusKeyboard() }
         }
 
         if newSessionTrigger != coord.lastNewSessionTrigger {
@@ -38,7 +34,6 @@ struct NativeTerminalView: UIViewRepresentable {
 
     func makeCoordinator() -> Coordinator { Coordinator() }
     class Coordinator {
-        var lastIsActive = false
         var lastFocusTrigger = 0
         var lastNewSessionTrigger = 0
     }
@@ -177,53 +172,17 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     }
 
     @objc func focusKeyboard() {
-        focusKeyboardWithRetry()
-    }
-
-    func focusKeyboardWithRetry(attempt: Int = 0) {
-        if keyProxy.becomeFirstResponder() {
-            return
-        }
-        // Retry up to 4 times with increasing delays if becomeFirstResponder fails
-        guard attempt < 4 else { return }
-        let delay = Double(attempt + 1) * 0.15
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, self.isActiveTab else { return }
-            self.focusKeyboardWithRetry(attempt: attempt + 1)
-        }
+        keyProxy.becomeFirstResponder()
     }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         if window != nil {
+            // Focus once on initial attach only
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                 guard let self, self.isActiveTab else { return }
-                self.focusKeyboardWithRetry()
+                self.focusKeyboard()
             }
-            NotificationCenter.default.addObserver(self, selector: #selector(onWindowKey),
-                name: UIWindow.didBecomeKeyNotification, object: nil)
-            NotificationCenter.default.addObserver(self, selector: #selector(onAppForeground),
-                name: UIApplication.didBecomeActiveNotification, object: nil)
-        } else {
-            NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeKeyNotification, object: nil)
-            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
-        }
-    }
-
-    @objc private func onWindowKey() {
-        guard isActiveTab, window?.isKeyWindow == true else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            guard let self, self.isActiveTab else { return }
-            self.focusKeyboardWithRetry()
-        }
-    }
-
-    @objc private func onAppForeground() {
-        guard isActiveTab else { return }
-        // 0.5s — app needs time to fully resume before keyboard accepts focus
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            guard let self, self.isActiveTab else { return }
-            self.focusKeyboardWithRetry()
         }
     }
 
