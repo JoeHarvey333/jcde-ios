@@ -59,22 +59,20 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
             }
             NotificationCenter.default.addObserver(
                 self,
-                selector: #selector(appDidBecomeActive),
-                name: UIApplication.didBecomeActiveNotification,
+                selector: #selector(windowDidBecomeKey),
+                name: UIWindow.didBecomeKeyNotification,
                 object: nil
             )
         } else {
-            NotificationCenter.default.removeObserver(self, name: UIApplication.didBecomeActiveNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: UIWindow.didBecomeKeyNotification, object: nil)
         }
     }
 
-    @objc private func appDidBecomeActive() {
-        guard isActiveTab else { return }
-        for delay in [0.1, 0.3, 0.6, 1.0] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self, self.isActiveTab, !self.isFirstResponder else { return }
-                self.becomeFirstResponder()
-            }
+    @objc private func windowDidBecomeKey() {
+        guard isActiveTab, window?.isKeyWindow == true else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self, self.isActiveTab, !self.isFirstResponder else { return }
+            self.becomeFirstResponder()
         }
     }
 
