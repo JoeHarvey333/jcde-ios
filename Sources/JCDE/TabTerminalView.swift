@@ -5,24 +5,23 @@ struct TabTerminalView: View {
     @Binding var activeProject: Project?
     @Environment(\.dismiss) private var dismiss
     @State private var showProjectPicker = false
-    @State private var newSessionTrigger = 0
-    @State private var showNewSessionConfirm = false
-    @State private var showTapToType = false
-    @State private var didBackground = false
-    @State private var focusAction: (() -> Void)? = nil
     @StateObject private var store = ProjectsStore()
 
     var body: some View {
         VStack(spacing: 0) {
             // Tab bar
             HStack(spacing: 0) {
-                Button { dismiss() } label: {
+                // Grid icon — back to project list (keeps tabs alive)
+                Button {
+                    dismiss()
+                } label: {
                     Image(systemName: "square.grid.2x2")
                         .font(.system(size: 15))
                         .foregroundColor(Color(hex: "7B7BFF"))
                         .frame(width: 44, height: 44)
                 }
 
+                // Tabs
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(openProjects) { project in
@@ -36,6 +35,7 @@ struct TabTerminalView: View {
                     }
                 }
 
+                // Open URL for active project
                 if let urlString = activeProject?.url, let url = URL(string: urlString) {
                     Link(destination: url) {
                         Text("Open ↗")
@@ -45,14 +45,10 @@ struct TabTerminalView: View {
                     }
                 }
 
-                Button { showNewSessionConfirm = true } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 15))
-                        .foregroundColor(Color(hex: "7B7BFF"))
-                        .frame(width: 44, height: 44)
-                }
-
-                Button { showProjectPicker = true } label: {
+                // + button to add a tab
+                Button {
+                    showProjectPicker = true
+                } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 15))
                         .foregroundColor(Color(hex: "7B7BFF"))
@@ -62,38 +58,16 @@ struct TabTerminalView: View {
             .frame(height: 44)
             .background(Color(hex: "16161E"))
 
-            Rectangle().fill(Color(hex: "2A2A35")).frame(height: 1)
+            Rectangle()
+                .fill(Color(hex: "2A2A35"))
+                .frame(height: 1)
 
-            // Terminal views — all kept alive, only active is visible
+            // Terminal views — all alive, only active visible
             ZStack {
                 ForEach(openProjects) { project in
-                    NativeTerminalView(
-                        project: project,
-                        isActive: activeProject?.key == project.key,
-                        newSessionTrigger: activeProject?.key == project.key ? newSessionTrigger : 0,
-                        focusAction: $focusAction
-                    )
-                }
-
-                // Tap-to-type overlay — only shown after returning from background
-                if showTapToType {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            showTapToType = false
-                            focusAction?()
-                        }
-                        .overlay(
-                            Text("Tap to type")
-                                .font(.system(size: 14))
-                                .foregroundColor(Color(hex: "7B7BFF").opacity(0.8))
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(Color(hex: "22222A").opacity(0.9))
-                                .cornerRadius(10)
-                                .padding(.bottom, 40),
-                            alignment: .bottom
-                        )
+                    NativeTerminalView(project: project, isActive: activeProject?.key == project.key)
+                        .opacity(activeProject?.key == project.key ? 1 : 0)
+                        .allowsHitTesting(activeProject?.key == project.key)
                 }
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -110,25 +84,6 @@ struct TabTerminalView: View {
             }
         }
         .task { await store.load() }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
-            didBackground = true
-        }
-        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-            if didBackground {
-                didBackground = false
-                showTapToType = true
-            }
-        }
-        .confirmationDialog(
-            "Start a new Claude session for \(activeProject?.name ?? "this project")?",
-            isPresented: $showNewSessionConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("New Session", role: .destructive) { newSessionTrigger += 1 }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("The current session and context will be cleared. Chat history is preserved.")
-        }
     }
 
     private func closeTab(_ project: Project) {
@@ -136,7 +91,9 @@ struct TabTerminalView: View {
         if activeProject?.key == project.key {
             activeProject = openProjects.last
         }
-        if openProjects.isEmpty { dismiss() }
+        if openProjects.isEmpty {
+            dismiss()
+        }
     }
 }
 
