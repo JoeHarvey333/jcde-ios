@@ -21,10 +21,11 @@ struct NativeTerminalView: UIViewRepresentable {
     }
 }
 
-class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
+class JCDETerminalHostView: TerminalView, TerminalViewDelegate, UIGestureRecognizerDelegate {
     private var wsTask: URLSessionWebSocketTask?
     private var wsSession: URLSession?
     var isActiveTab: Bool = true
+    private var scrollPan: UIPanGestureRecognizer!
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -34,12 +35,28 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
         inputAssistantItem.leadingBarButtonGroups = []
         inputAssistantItem.trailingBarButtonGroups = []
 
+        // Custom pan for scroll — bypasses SwiftUI gesture system on iPadOS 26
+        scrollPan = UIPanGestureRecognizer(target: self, action: #selector(handleScroll(_:)))
+        scrollPan.delegate = self
+        scrollPan.cancelsTouchesInView = false
+        addGestureRecognizer(scrollPan)
+
         let tap = UITapGestureRecognizer(target: self, action: #selector(claimFocus))
         tap.cancelsTouchesInView = false
         addGestureRecognizer(tap)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    // Allow pan to fire alongside any other gesture (SwiftUI included)
+    func gestureRecognizer(_ g: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
+
+    @objc private func handleScroll(_ g: UIPanGestureRecognizer) {
+        let t = g.translation(in: self)
+        g.setTranslation(.zero, in: self)
+        let newY = (contentOffset.y - t.y).clamped(to: 0...(max(0, contentSize.height - bounds.height)))
+        setContentOffset(CGPoint(x: 0, y: newY), animated: false)
+    }
 
     override func didMoveToWindow() {
         super.didMoveToWindow()
@@ -122,8 +139,11 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
     func rangeChanged(source: TerminalView, startY: Int, endY: Int) {}
     func clipboardCopy(source: TerminalView, content: Data) {}
 
-    deinit {
-        wsTask?.cancel()
-    }
+    deinit { wsTask?.cancel() }
 }
 
+private extension CGFloat {
+    func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
+        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
+    }
+}
