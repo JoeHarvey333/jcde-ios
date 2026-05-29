@@ -118,29 +118,32 @@ struct TabTerminalView: View {
             }
             .ignoresSafeArea(.container, edges: .bottom)
 
-            // Control bar — always visible, not attached to keyboard (fixes hardware keyboard bar)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(controlKeys, id: \.0) { key in
-                        Button {
-                            sendBytesAction?(Data(key.1))
-                        } label: {
-                            Text(key.0)
-                                .font(.system(size: 13, weight: .medium, design: .monospaced))
-                                .foregroundColor(Color(hex: "B0B0FF"))
-                                .frame(height: 32)
-                                .padding(.horizontal, 10)
-                                .background(Color(hex: "1E1E28"))
-                                .cornerRadius(6)
-                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: "33333D"), lineWidth: 1))
+            // Control bar — always visible, not attached to keyboard
+            VStack(spacing: 0) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(controlKeys, id: \.0) { key in
+                            Button {
+                                sendBytesAction?(Data(key.1))
+                            } label: {
+                                Text(key.0)
+                                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                                    .foregroundColor(Color(hex: "B0B0FF"))
+                                    .frame(height: 32)
+                                    .padding(.horizontal, 10)
+                                    .background(Color(hex: "1E1E28"))
+                                    .cornerRadius(6)
+                                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(hex: "33333D"), lineWidth: 1))
+                            }
                         }
                     }
+                    .padding(.horizontal, 8)
                 }
-                .padding(.horizontal, 8)
+                .frame(height: 44)
+                // Safe area spacer below control bar (above home indicator)
+                Color(hex: "16161E").frame(height: safeAreaBottom)
             }
-            .frame(height: 44)
             .background(Color(hex: "16161E"))
-            .padding(.bottom, safeAreaBottom)
         }
         .background(Color(hex: "0E0E12"))
         .preferredColorScheme(.dark)
