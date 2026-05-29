@@ -205,7 +205,9 @@ class JCDETerminalHostView: TerminalView, TerminalViewDelegate {
 
     @objc private func onAppForeground() {
         guard isActiveTab else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+        // Resign then re-claim — forces iOS to properly re-establish keyboard after background
+        keyProxy.resignFirstResponder()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
             guard let self, self.isActiveTab else { return }
             _ = self.keyProxy.becomeFirstResponder()
         }

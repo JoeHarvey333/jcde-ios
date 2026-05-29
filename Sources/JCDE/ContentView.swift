@@ -8,34 +8,32 @@ struct ContentView: View {
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
 
     var body: some View {
-        ZStack {
-            NavigationStack {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(store.projects) { project in
-                            ProjectCard(project: project)
-                                .onTapGesture { open(project) }
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                }
-                .navigationTitle("JCDE")
-                .navigationBarTitleDisplayMode(.large)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
-                            .font(.system(size: 13))
-                            .foregroundColor(Color(hex: "555560"))
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(store.projects) { project in
+                        ProjectCard(project: project)
+                            .onTapGesture { open(project) }
                     }
                 }
-                .background(Color(hex: "0E0E12"))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
             }
-
-            if activeProject != nil {
-                Color(hex: "0E0E12").ignoresSafeArea()
+            .navigationTitle("JCDE")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                        .font(.system(size: 13))
+                        .foregroundColor(Color(hex: "555560"))
+                }
+            }
+            .background(Color(hex: "0E0E12"))
+            .fullScreenCover(isPresented: Binding(
+                get: { activeProject != nil },
+                set: { if !$0 { activeProject = nil } }
+            )) {
                 TabTerminalView(openProjects: $openProjects, activeProject: $activeProject)
-                    .ignoresSafeArea()
             }
         }
         .task { await store.load() }
