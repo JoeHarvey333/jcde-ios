@@ -70,14 +70,19 @@ struct ProjectCard: View {
 
                 Spacer()
 
-                if project.url != nil {
-                    Text("Open ↗")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color(hex: "7B7BFF"))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color(hex: "7B7BFF").opacity(0.12))
-                        .cornerRadius(6)
+                if let urlString = project.url, let url = URL(string: urlString) {
+                    Button {
+                        UIApplication.shared.open(url)
+                    } label: {
+                        Text("Open ↗")
+                            .font(.system(size: 11))
+                            .foregroundColor(Color(hex: "7B7BFF"))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color(hex: "7B7BFF").opacity(0.12))
+                            .cornerRadius(6)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
