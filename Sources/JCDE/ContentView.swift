@@ -4,13 +4,9 @@ struct ContentView: View {
     @StateObject private var store = ProjectsStore()
     @State private var openProjects: [Project] = []
     @State private var activeProject: Project?
+    @State private var reordering = false
 
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
-
-    // Drag state
-    @State private var draggingKey: String? = nil
-    @State private var dragLocation: CGPoint = .zero
-    @GestureState private var longPressActive = false
 
     var body: some View {
         Group {
@@ -24,68 +20,52 @@ struct ContentView: View {
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(store.projects) { project in
                                 ProjectCard(project: project)
-                                    .opacity(draggingKey == project.key ? 0.3 : 1.0)
-                                    .scaleEffect(draggingKey == project.key ? 0.95 : 1.0)
-                                    .background(
-                                        GeometryReader { geo in
-                                            Color.clear.preference(
-                                                key: CardFrameKey.self,
-                                                value: [project.key: geo.frame(in: .global)]
-                                            )
+                                    .opacity(reordering ? 0.85 : 1.0)
+                                    .overlay(alignment: .topTrailing) {
+                                        if reordering {
+                                            Image(systemName: "line.3.horizontal")
+                                                .font(.system(size: 12))
+                                                .foregroundColor(Color(hex: "555560"))
+                                                .padding(10)
                                         }
-                                    )
-                                    .onTapGesture {
-                                        if draggingKey == nil { open(project) }
                                     }
-                                    .gesture(
-                                        LongPressGesture(minimumDuration: 0.4)
-                                            .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
-                                            .onChanged { value in
-                                                switch value {
-                                                case .second(true, let drag):
-                                                    if draggingKey == nil { draggingKey = project.key }
-                                                    if let drag = drag {
-                                                        dragLocation = drag.location
-                                                    }
-                                                default:
-                                                    break
-                                                }
-                                            }
-                                            .onEnded { _ in
-                                                if draggingKey != nil {
-                                                    let keys = store.projects.map { $0.key }
-                                                    Task { await store.reorder(keys: keys) }
-                                                    draggingKey = nil
-                                                }
-                                            }
-                                    )
+                                    .onTapGesture {
+                                        if !reordering { open(project) }
+                                    }
+                                    .gesture(reordering ? dragGesture(for: project) : nil)
                             }
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        .onPreferenceChange(CardFrameKey.self) { frames in
-                            guard let key = draggingKey else { return }
-                            let loc = dragLocation
-                            // Find which card the drag is over (not the dragged card)
-                            if let target = frames.first(where: { $0.key != key && $0.value.contains(loc) }) {
-                                guard let fromIdx = store.projects.firstIndex(where: { $0.key == key }),
-                                      let toIdx = store.projects.firstIndex(where: { $0.key == target.key }) else { return }
-                                if fromIdx != toIdx {
-                                    withAnimation(.interactiveSpring()) {
-                                        store.projects.move(fromOffsets: IndexSet(integer: fromIdx),
-                                                            toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx)
-                                    }
-                                }
-                            }
-                        }
                     }
+                    .scrollDisabled(reordering)
                     .navigationTitle("JCDE")
                     .navigationBarTitleDisplayMode(.large)
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
-                            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
-                                .font(.system(size: 13))
-                                .foregroundColor(Color(hex: "555560"))
+                            if reordering {
+                                Button("Done") {
+                                    let keys = store.projects.map { $0.key }
+                                    Task { await store.reorder(keys: keys) }
+                                    reordering = false
+                                }
+                                .foregroundColor(Color(hex: "7B7BFF"))
+                            } else {
+                                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(Color(hex: "555560"))
+                            }
+                        }
+                        ToolbarItem(placement: .topBarLeading) {
+                            if !reordering {
+                                Button {
+                                    reordering = true
+                                } label: {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                        .font(.system(size: 15))
+                                        .foregroundColor(Color(hex: "555560"))
+                                }
+                            }
                         }
                     }
                     .background(Color(hex: "0E0E12"))
@@ -95,18 +75,31 @@ struct ContentView: View {
         .task { await store.load() }
     }
 
+    private func dragGesture(for project: Project) -> some Gesture {
+        DragGesture(minimumDistance: 8, coordinateSpace: .global)
+            .onChanged { value in
+                guard let fromIdx = store.projects.firstIndex(where: { $0.key == project.key }) else { return }
+                // Find card under drag location using simple index estimation
+                let x = value.location.x
+                let col = x < UIScreen.main.bounds.width / 2 ? 0 : 1
+                let cardHeight: CGFloat = 114 // 90 minHeight + 12 spacing + padding
+                let gridTop: CGFloat = 140
+                let row = max(0, Int((value.location.y - gridTop) / cardHeight))
+                let toIdx = min(row * 2 + col, store.projects.count - 1)
+                if toIdx != fromIdx {
+                    withAnimation(.interactiveSpring()) {
+                        store.projects.move(fromOffsets: IndexSet(integer: fromIdx),
+                                            toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx)
+                    }
+                }
+            }
+    }
+
     private func open(_ project: Project) {
         if !openProjects.contains(where: { $0.key == project.key }) {
             openProjects.append(project)
         }
         activeProject = project
-    }
-}
-
-private struct CardFrameKey: PreferenceKey {
-    static var defaultValue: [String: CGRect] = [:]
-    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
-        value.merge(nextValue()) { $1 }
     }
 }
 
